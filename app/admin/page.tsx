@@ -15,6 +15,8 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [migrating, setMigrating] = useState(false)
+  const [migrateMessage, setMigrateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     checkAuth()
@@ -113,6 +115,34 @@ export default function AdminPage() {
     })
   }
 
+  const handleDatabaseMigrate = async () => {
+    if (!confirm('确定要执行数据库迁移吗？这将为用户表添加API配置字段。')) {
+      return
+    }
+
+    try {
+      setMigrating(true)
+      setMigrateMessage(null)
+
+      const response = await fetch('/api/admin/migrate', {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setMigrateMessage({ type: 'success', text: data.message })
+      } else {
+        setMigrateMessage({ type: 'error', text: data.error || '迁移失败' })
+      }
+    } catch (error) {
+      console.error('数据库迁移失败:', error)
+      setMigrateMessage({ type: 'error', text: '迁移失败，请重试' })
+    } finally {
+      setMigrating(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -194,6 +224,36 @@ export default function AdminPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 数据库工具 */}
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">数据库工具</h2>
+
+          {migrateMessage && (
+            <div className={`mb-4 p-4 rounded-lg ${
+              migrateMessage.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+            }`}>
+              <p className={`text-sm ${migrateMessage.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+                {migrateMessage.text}
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-start gap-4">
+            <button
+              onClick={handleDatabaseMigrate}
+              disabled={migrating}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              {migrating ? '迁移中...' : '执行数据库迁移'}
+            </button>
+            <div className="flex-1">
+              <p className="text-sm text-gray-600">
+                为用户表添加 API Key 配置字段。如果用户无法保存 API 配置，请执行此迁移。
+              </p>
             </div>
           </div>
         </div>
