@@ -6,20 +6,28 @@ export async function GET() {
   try {
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
-    const allDocIds = await vectorStore.listDocuments()
 
-    // 按文件名分组统计
-    const fileStats = new Map<string, number>()
+    // listDocuments() 现在直接返回文件名列表（已去重）
+    const filenames = await vectorStore.listDocuments()
 
-    for (const docId of allDocIds) {
-      const filename = docId.split('_chunk_')[0]
-      fileStats.set(filename, (fileStats.get(filename) || 0) + 1)
-    }
+    // 为每个文件统计片段数量
+    const documents = await Promise.all(
+      filenames.map(async (filename) => {
+        // 从数据库查询该文件的片段数量
+        const sql = (await import('@/lib/db-schema')).getSql()
+        const result = await sql`
+          SELECT COUNT(*) as count
+          FROM documents
+          WHERE source = ${filename}
+        `
+        const chunks = Number(result[0]?.count || 0)
 
-    const documents = Array.from(fileStats.entries()).map(([filename, chunks]) => ({
-      filename,
-      chunks,
-    }))
+        return {
+          filename,
+          chunks,
+        }
+      })
+    )
 
     return NextResponse.json({
       success: true,
