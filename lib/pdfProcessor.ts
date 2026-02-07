@@ -26,46 +26,24 @@ export async function processPDF(
 
     console.log(`开始处理PDF: ${filename}, 大小: ${buffer.length} 字节`)
 
-    // 动态导入 pdfjs-dist
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    // 动态导入 unpdf
+    const { extractText, getDocumentProxy } = await import('unpdf')
 
-    // 将 Buffer 转换为 Uint8Array
-    const data = new Uint8Array(buffer)
+    // 提取 PDF 文本
+    const data = await getDocumentProxy(buffer)
+    const { text, totalPages } = await extractText(data, { mergePages: true })
 
-    // 加载 PDF 文档，禁用 worker
-    const loadingTask = pdfjsLib.getDocument({
-      data,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    })
-    const pdfDocument = await loadingTask.promise
-
-    const totalPages = pdfDocument.numPages
-    console.log(`PDF加载成功: ${filename}, 页数: ${totalPages}`)
-
-    // 提取所有页面的文本
-    let fullText = ''
-    for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-      const page = await pdfDocument.getPage(pageNum)
-      const textContent = await page.getTextContent()
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ')
-      fullText += pageText + ' '
-    }
-
-    console.log(`PDF文本提取成功: ${filename}, 文本长度: ${fullText.length}`)
+    console.log(`PDF解析成功: ${filename}, 页数: ${totalPages}, 文本长度: ${text.length}`)
 
     // 分割文本为段落（每500字符一个片段，保持上下文）
     const chunkSize = 500
     const overlap = 100
     const chunks: string[] = []
 
-    const text = fullText.replace(/\s+/g, ' ').trim()
+    const cleanedText = text.replace(/\s+/g, ' ').trim()
 
-    for (let i = 0; i < text.length; i += chunkSize - overlap) {
-      const chunk = text.slice(i, i + chunkSize)
+    for (let i = 0; i < cleanedText.length; i += chunkSize - overlap) {
+      const chunk = cleanedText.slice(i, i + chunkSize)
       if (chunk.length > 50) {
         // 过滤太短的片段
         chunks.push(chunk)
@@ -80,7 +58,7 @@ export async function processPDF(
       content: chunk,
       metadata: {
         source: filename,
-        page: Math.floor((index * (chunkSize - overlap)) / (text.length / totalPages)),
+        page: Math.floor((index * (chunkSize - overlap)) / (cleanedText.length / totalPages)),
         title: filename,
       },
     }))
