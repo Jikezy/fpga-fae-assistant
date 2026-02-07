@@ -16,6 +16,28 @@ export async function initializeDatabase() {
   const sql = neon(getDatabaseUrl())
 
   try {
+    // 创建用户表
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    // 创建会话表
+    await sql`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
     // 创建文档表
     await sql`
       CREATE TABLE IF NOT EXISTS documents (
@@ -39,6 +61,18 @@ export async function initializeDatabase() {
     `
 
     // 创建索引以提高查询性能
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)
+    `
+
     await sql`
       CREATE INDEX IF NOT EXISTS idx_documents_source ON documents(source)
     `
