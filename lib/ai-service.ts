@@ -45,6 +45,7 @@ export class AIService {
     if (this.config.provider === 'anthropic' && this.config.apiKey) {
       this.anthropic = new Anthropic({
         apiKey: this.config.apiKey,
+        baseURL: this.config.baseURL,
       })
     }
   }
@@ -76,6 +77,8 @@ export class AIService {
    */
   private getBaseURL(provider: string): string {
     switch (provider) {
+      case 'anthropic':
+        return process.env.ANTHROPIC_BASE_URL || ''
       case 'ollama':
         return process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
       case 'zhipu':
