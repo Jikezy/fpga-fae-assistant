@@ -29,8 +29,11 @@ export async function processPDF(
     // 动态导入 unpdf
     const { extractText, getDocumentProxy } = await import('unpdf')
 
+    // 将 Buffer 转换为 Uint8Array（unpdf 要求）
+    const uint8Array = new Uint8Array(buffer)
+
     // 提取 PDF 文本
-    const data = await getDocumentProxy(buffer)
+    const data = await getDocumentProxy(uint8Array)
     const { text, totalPages } = await extractText(data, { mergePages: true })
 
     console.log(`PDF解析成功: ${filename}, 页数: ${totalPages}, 文本长度: ${text.length}`)
