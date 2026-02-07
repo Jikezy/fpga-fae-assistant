@@ -211,8 +211,10 @@ export class SimpleVectorStore {
     const sql = getSql()
     try {
       const rows = await sql`
-        SELECT DISTINCT source FROM documents
-        ORDER BY created_at DESC
+        SELECT source, MAX(created_at) as latest_created_at
+        FROM documents
+        GROUP BY source
+        ORDER BY latest_created_at DESC
       `
       return rows.map((row: any) => row.source)
     } catch (error) {
