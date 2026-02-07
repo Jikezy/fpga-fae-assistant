@@ -1,8 +1,8 @@
 import { neon } from '@neondatabase/serverless'
 
-// 获取数据库连接字符串（Vercel会自动注入STORAGE_DATABASE_URL）
+// 获取数据库连接字符串（Vercel会自动注入POSTGRES_URL）
 const getDatabaseUrl = () => {
-  const url = process.env.STORAGE_DATABASE_URL
+  const url = process.env.POSTGRES_URL || process.env.DATABASE_URL
   if (!url) {
     throw new Error('数据库连接字符串未配置')
   }
