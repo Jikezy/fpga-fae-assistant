@@ -71,6 +71,8 @@ export class SimpleVectorStore {
     const sql = getSql()
 
     try {
+      console.log('[搜索] 开始搜索，查询:', query, 'topK:', topK)
+
       // 从数据库读取所有文档
       const rows = await sql`
         SELECT id, content, source, page, title
@@ -78,8 +80,10 @@ export class SimpleVectorStore {
         ORDER BY created_at ASC
       `
 
+      console.log('[搜索] 从数据库读取了', rows.length, '行数据')
+
       if (rows.length === 0) {
-        console.log('数据库中没有文档')
+        console.log('[搜索] 数据库中没有文档')
         return []
       }
 
@@ -94,7 +98,7 @@ export class SimpleVectorStore {
         },
       }))
 
-      console.log(`从数据库加载了 ${documents.length} 个文档`)
+      console.log(`[搜索] 从数据库加载了 ${documents.length} 个文档片段`)
 
       // 如果是泛泛的询问（比如"pdf讲的什么"），返回前面的文档片段作为概览
       const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about']

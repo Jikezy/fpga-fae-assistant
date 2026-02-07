@@ -42,13 +42,14 @@ export async function POST(req: NextRequest) {
 
         // 检查是否有文档
         const allDocs = await vectorStore.listDocuments()
-        console.log(`向量存储中共有 ${allDocs.length} 个文档片段`)
+        console.log(`向量存储中共有 ${allDocs.length} 个文档文件:`, allDocs)
 
         if (allDocs.length === 0) {
           console.log('警告: 向量存储为空，没有可搜索的文档')
         } else {
+          console.log('开始搜索文档，查询内容:', lastMessage.content)
           const relevantDocs = await vectorStore.search(lastMessage.content, 5)
-          console.log(`检索到 ${relevantDocs.length} 个相关文档`)
+          console.log(`检索到 ${relevantDocs.length} 个相关文档片段`)
 
           if (relevantDocs.length > 0) {
             // 构建上下文信息
