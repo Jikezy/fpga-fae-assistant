@@ -26,7 +26,7 @@ export async function processPDF(
     const overlap = 100
     const chunks: string[] = []
 
-    let text = data.text.replace(/\s+/g, ' ').trim()
+    const text = data.text.replace(/\s+/g, ' ').trim()
 
     for (let i = 0; i < text.length; i += chunkSize - overlap) {
       const chunk = text.slice(i, i + chunkSize)
