@@ -48,6 +48,7 @@ export async function initializeDatabase() {
         source TEXT NOT NULL,
         page INTEGER,
         title TEXT,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `
@@ -58,6 +59,7 @@ export async function initializeDatabase() {
         id TEXT PRIMARY KEY,
         document_id TEXT REFERENCES documents(id) ON DELETE CASCADE,
         embedding_vector TEXT NOT NULL,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `
@@ -80,7 +82,15 @@ export async function initializeDatabase() {
     `
 
     await sql`
+      CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)
+    `
+
+    await sql`
       CREATE INDEX IF NOT EXISTS idx_embeddings_document_id ON embeddings(document_id)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_embeddings_user_id ON embeddings(user_id)
     `
 
     console.log('数据库表初始化成功')

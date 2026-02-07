@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
 
-    // listDocuments() 返回包含文件名、上传时间和片段数的数组
-    const documentsInfo = await vectorStore.listDocuments()
+    // listDocuments() 返回包含文件名、上传时间和片段数的数组（只返回当前用户的文档）
+    const documentsInfo = await vectorStore.listDocuments(authResult.user.id)
 
     const documents = documentsInfo.map(info => ({
       filename: info.source,
@@ -60,7 +60,7 @@ export async function DELETE(req: NextRequest) {
 
     let deletedCount = 0
     for (const filename of filenames) {
-      const count = await vectorStore.deleteDocumentsBySource(filename)
+      const count = await vectorStore.deleteDocumentsBySource(filename, authResult.user.id)
       deletedCount += count
     }
 

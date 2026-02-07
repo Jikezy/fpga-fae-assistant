@@ -91,15 +91,15 @@ export async function POST(req: NextRequest) {
 
         console.log('用户问题:', lastMessage.content)
 
-        // 检查是否有文档
-        const allDocs = await vectorStore.listDocuments()
-        console.log(`向量存储中共有 ${allDocs.length} 个文档文件:`, allDocs.map(d => d.source))
+        // 检查是否有文档（只查询当前用户的文档）
+        const allDocs = await vectorStore.listDocuments(authResult.user.id)
+        console.log(`用户 ${authResult.user.id} 的向量存储中共有 ${allDocs.length} 个文档文件:`, allDocs.map(d => d.source))
 
         if (allDocs.length === 0) {
-          console.log('警告: 向量存储为空，没有可搜索的文档')
+          console.log('警告: 该用户的向量存储为空，没有可搜索的文档')
         } else {
           console.log('开始搜索文档，查询内容:', lastMessage.content)
-          const relevantDocs = await vectorStore.search(lastMessage.content, 8) // 增加到8个片段获取更详细内容
+          const relevantDocs = await vectorStore.search(lastMessage.content, 8, authResult.user.id) // 只搜索当前用户的文档
           console.log(`检索到 ${relevantDocs.length} 个相关文档片段`)
 
           if (relevantDocs.length > 0) {

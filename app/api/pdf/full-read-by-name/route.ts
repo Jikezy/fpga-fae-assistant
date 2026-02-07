@@ -61,20 +61,20 @@ export async function POST(req: NextRequest) {
       baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
     }
 
-    // 从数据库获取该文件的所有文档片段
+    // 从数据库获取该文件的所有文档片段（仅当前用户的）
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
 
     const documents = await sql`
       SELECT content, page
       FROM documents
-      WHERE source = ${filename}
+      WHERE source = ${filename} AND user_id = ${authResult.user.id}
       ORDER BY page ASC
     `
 
     if (documents.length === 0) {
       return NextResponse.json(
-        { error: '文档不存在' },
+        { error: '文档不存在或您无权访问' },
         { status: 404 }
       )
     }

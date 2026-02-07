@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
 
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
-    await vectorStore.addDocuments(processed.documents)
+    await vectorStore.addDocuments(processed.documents, authResult.user.id)
 
     return NextResponse.json({
       success: true,

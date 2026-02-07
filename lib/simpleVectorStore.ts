@@ -33,30 +33,32 @@ export class SimpleVectorStore {
     }
   }
 
-  async addDocuments(documents: Document[]) {
+  async addDocuments(documents: Document[], userId: string) {
     const sql = getSql()
 
     try {
       // 批量插入文档到数据库
       for (const doc of documents) {
         await sql`
-          INSERT INTO documents (id, content, source, page, title)
+          INSERT INTO documents (id, content, source, page, title, user_id)
           VALUES (
             ${doc.id},
             ${doc.content},
             ${doc.metadata.source},
             ${doc.metadata.page || null},
-            ${doc.metadata.title || null}
+            ${doc.metadata.title || null},
+            ${userId}
           )
           ON CONFLICT (id) DO UPDATE SET
             content = EXCLUDED.content,
             source = EXCLUDED.source,
             page = EXCLUDED.page,
-            title = EXCLUDED.title
+            title = EXCLUDED.title,
+            user_id = EXCLUDED.user_id
         `
       }
 
-      console.log(`成功添加 ${documents.length} 个文档片段到数据库`)
+      console.log(`成功添加 ${documents.length} 个文档片段到数据库（用户：${userId}）`)
     } catch (error) {
       console.error('添加文档失败:', error)
       throw error
@@ -68,18 +70,25 @@ export class SimpleVectorStore {
    * 使用关键词匹配和文本重叠度
    * 支持多文档均衡检索
    */
-  async search(query: string, topK: number = 5): Promise<Document[]> {
+  async search(query: string, topK: number = 5, userId?: string): Promise<Document[]> {
     const sql = getSql()
 
     try {
-      console.log('[搜索] 开始搜索，查询:', query, 'topK:', topK)
+      console.log('[搜索] 开始搜索，查询:', query, 'topK:', topK, 'userId:', userId)
 
-      // 从数据库读取所有文档
-      const rows = await sql`
-        SELECT id, content, source, page, title
-        FROM documents
-        ORDER BY created_at ASC
-      `
+      // 从数据库读取文档（如果指定了userId，则只读取该用户的文档）
+      const rows = userId
+        ? await sql`
+            SELECT id, content, source, page, title
+            FROM documents
+            WHERE user_id = ${userId}
+            ORDER BY created_at ASC
+          `
+        : await sql`
+            SELECT id, content, source, page, title
+            FROM documents
+            ORDER BY created_at ASC
+          `
 
       console.log('[搜索] 从数据库读取了', rows.length, '行数据')
 
@@ -241,15 +250,15 @@ export class SimpleVectorStore {
     }
   }
 
-  async deleteDocumentsBySource(source: string): Promise<number> {
+  async deleteDocumentsBySource(source: string, userId: string): Promise<number> {
     const sql = getSql()
     try {
       const result = await sql`
         DELETE FROM documents
-        WHERE source = ${source}
+        WHERE source = ${source} AND user_id = ${userId}
       `
       const deletedCount = result.length || 0
-      console.log(`已删除 ${source} 的 ${deletedCount} 个文档片段`)
+      console.log(`已删除 ${source} 的 ${deletedCount} 个文档片段（用户：${userId}）`)
       return deletedCount
     } catch (error) {
       console.error('删除文档失败:', error)
@@ -257,18 +266,29 @@ export class SimpleVectorStore {
     }
   }
 
-  async listDocuments(): Promise<Array<{ source: string; uploadedAt: Date; chunks: number }>> {
+  async listDocuments(userId?: string): Promise<Array<{ source: string; uploadedAt: Date; chunks: number }>> {
     const sql = getSql()
     try {
-      const rows = await sql`
-        SELECT
-          source,
-          COUNT(*) as chunks,
-          MIN(created_at) as uploaded_at
-        FROM documents
-        GROUP BY source
-        ORDER BY uploaded_at DESC
-      `
+      const rows = userId
+        ? await sql`
+            SELECT
+              source,
+              COUNT(*) as chunks,
+              MIN(created_at) as uploaded_at
+            FROM documents
+            WHERE user_id = ${userId}
+            GROUP BY source
+            ORDER BY uploaded_at DESC
+          `
+        : await sql`
+            SELECT
+              source,
+              COUNT(*) as chunks,
+              MIN(created_at) as uploaded_at
+            FROM documents
+            GROUP BY source
+            ORDER BY uploaded_at DESC
+          `
       return rows.map((row: any) => ({
         source: row.source,
         uploadedAt: new Date(row.uploaded_at),
