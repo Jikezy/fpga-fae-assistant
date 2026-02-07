@@ -1,3 +1,5 @@
+import { getSql, initializeDatabase } from './db-schema'
+
 export interface Document {
   id: string
   content: string
@@ -8,37 +10,57 @@ export interface Document {
   }
 }
 
-// 使用全局变量确保数据在 Next.js 热重载时不丢失
-const globalForVectorStore = global as unknown as {
-  vectorStoreDocuments: Map<string, Document> | undefined
-}
-
 /**
- * 简单的内存向量存储
+ * 持久化向量存储（使用 Neon Postgres）
  * 使用 TF-IDF 和余弦相似度进行文档检索
  */
 export class SimpleVectorStore {
-  private documents: Map<string, Document>
   private initialized: boolean = false
 
-  constructor() {
-    // 使用全局变量确保在 Next.js 开发模式下数据持久化
-    if (!globalForVectorStore.vectorStoreDocuments) {
-      globalForVectorStore.vectorStoreDocuments = new Map()
-    }
-    this.documents = globalForVectorStore.vectorStoreDocuments
-  }
+  constructor() {}
 
   async initialize() {
-    this.initialized = true
-    console.log('简单向量存储初始化成功')
+    if (this.initialized) return
+
+    try {
+      // 初始化数据库表结构
+      await initializeDatabase()
+      this.initialized = true
+      console.log('向量存储初始化成功（Postgres）')
+    } catch (error) {
+      console.error('向量存储初始化失败:', error)
+      throw error
+    }
   }
 
   async addDocuments(documents: Document[]) {
-    for (const doc of documents) {
-      this.documents.set(doc.id, doc)
+    const sql = getSql()
+
+    try {
+      // 批量插入文档到数据库
+      for (const doc of documents) {
+        await sql`
+          INSERT INTO documents (id, content, source, page, title)
+          VALUES (
+            ${doc.id},
+            ${doc.content},
+            ${doc.metadata.source},
+            ${doc.metadata.page || null},
+            ${doc.metadata.title || null}
+          )
+          ON CONFLICT (id) DO UPDATE SET
+            content = EXCLUDED.content,
+            source = EXCLUDED.source,
+            page = EXCLUDED.page,
+            title = EXCLUDED.title
+        `
+      }
+
+      console.log(`成功添加 ${documents.length} 个文档片段到数据库`)
+    } catch (error) {
+      console.error('添加文档失败:', error)
+      throw error
     }
-    console.log(`成功添加 ${documents.length} 个文档片段，总计 ${this.documents.size} 个`)
   }
 
   /**
@@ -46,45 +68,73 @@ export class SimpleVectorStore {
    * 使用关键词匹配和文本重叠度
    */
   async search(query: string, topK: number = 5): Promise<Document[]> {
-    // 如果是泛泛的询问（比如"pdf讲的什么"），返回前面的文档片段作为概览
-    const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about']
-    const isGeneralQuestion = generalQuestions.some(keyword =>
-      query.toLowerCase().includes(keyword)
-    ) && query.length < 20 // 短问题通常是泛泛的询问
+    const sql = getSql()
 
-    if (isGeneralQuestion && this.documents.size > 0) {
-      console.log('检测到泛泛询问，返回文档概览')
-      // 返回前面的几个文档片段
-      const docs = Array.from(this.documents.values())
-      return docs.slice(0, Math.min(topK, docs.length))
-    }
+    try {
+      // 从数据库读取所有文档
+      const rows = await sql`
+        SELECT id, content, source, page, title
+        FROM documents
+        ORDER BY created_at ASC
+      `
 
-    const queryTerms = this.tokenize(query.toLowerCase())
-    const results: Array<{ doc: Document; score: number }> = []
-
-    for (const doc of this.documents.values()) {
-      const docTerms = this.tokenize(doc.content.toLowerCase())
-      const score = this.calculateSimilarity(queryTerms, docTerms)
-
-      // 降低阈值，让更多文档能被匹配
-      if (score > 0.01) {  // 从 > 0 改为 > 0.01，避免完全不相关的内容
-        results.push({ doc, score })
+      if (rows.length === 0) {
+        console.log('数据库中没有文档')
+        return []
       }
+
+      // 转换为Document格式
+      const documents: Document[] = rows.map((row: any) => ({
+        id: row.id,
+        content: row.content,
+        metadata: {
+          source: row.source,
+          page: row.page || undefined,
+          title: row.title || undefined,
+        },
+      }))
+
+      console.log(`从数据库加载了 ${documents.length} 个文档`)
+
+      // 如果是泛泛的询问（比如"pdf讲的什么"），返回前面的文档片段作为概览
+      const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about']
+      const isGeneralQuestion = generalQuestions.some(keyword =>
+        query.toLowerCase().includes(keyword)
+      ) && query.length < 20
+
+      if (isGeneralQuestion) {
+        console.log('检测到泛泛询问，返回文档概览')
+        return documents.slice(0, Math.min(topK, documents.length))
+      }
+
+      const queryTerms = this.tokenize(query.toLowerCase())
+      const results: Array<{ doc: Document; score: number }> = []
+
+      for (const doc of documents) {
+        const docTerms = this.tokenize(doc.content.toLowerCase())
+        const score = this.calculateSimilarity(queryTerms, docTerms)
+
+        if (score > 0.01) {
+          results.push({ doc, score })
+        }
+      }
+
+      // 按相似度排序并返回前 topK 个结果
+      results.sort((a, b) => b.score - a.score)
+
+      const topResults = results.slice(0, topK).map(r => r.doc)
+
+      // 如果没找到足够的结果，返回前几个文档作为fallback
+      if (topResults.length < 3 && documents.length > 0) {
+        console.log('未找到足够的匹配文档，返回前几个文档作为fallback')
+        return documents.slice(0, Math.min(topK, documents.length))
+      }
+
+      return topResults
+    } catch (error) {
+      console.error('搜索文档失败:', error)
+      throw error
     }
-
-    // 按相似度排序并返回前 topK 个结果
-    results.sort((a, b) => b.score - a.score)
-
-    const topResults = results.slice(0, topK).map(r => r.doc)
-
-    // 如果没找到足够的结果，返回前几个文档作为fallback
-    if (topResults.length < 3 && this.documents.size > 0) {
-      console.log('未找到足够的匹配文档，返回前几个文档作为fallback')
-      const docs = Array.from(this.documents.values())
-      return docs.slice(0, Math.min(topK, docs.length))
-    }
-
-    return topResults
   }
 
   /**
@@ -131,33 +181,45 @@ export class SimpleVectorStore {
   }
 
   async deleteCollection() {
-    this.documents.clear()
-    console.log('向量存储已清空')
+    const sql = getSql()
+    try {
+      await sql`DELETE FROM documents`
+      console.log('向量存储已清空')
+    } catch (error) {
+      console.error('清空向量存储失败:', error)
+      throw error
+    }
   }
 
   async deleteDocumentsBySource(source: string): Promise<number> {
-    let deletedCount = 0
-    const keysToDelete: string[] = []
-
-    // 找出所有属于该文件的文档
-    for (const [id, doc] of this.documents.entries()) {
-      if (doc.metadata.source === source) {
-        keysToDelete.push(id)
-      }
+    const sql = getSql()
+    try {
+      const result = await sql`
+        DELETE FROM documents
+        WHERE source = ${source}
+      `
+      const deletedCount = result.length || 0
+      console.log(`已删除 ${source} 的 ${deletedCount} 个文档片段`)
+      return deletedCount
+    } catch (error) {
+      console.error('删除文档失败:', error)
+      throw error
     }
-
-    // 删除这些文档
-    for (const key of keysToDelete) {
-      this.documents.delete(key)
-      deletedCount++
-    }
-
-    console.log(`已删除 ${source} 的 ${deletedCount} 个文档片段`)
-    return deletedCount
   }
 
   async listDocuments(): Promise<string[]> {
-    return Array.from(this.documents.keys())
+    const sql = getSql()
+    try {
+      const rows = await sql`
+        SELECT DISTINCT source FROM documents
+        ORDER BY created_at DESC
+      `
+      return rows.map((row: any) => row.source)
+    } catch (error) {
+      console.error('列出文档失败:', error)
+      // 如果数据库查询失败，返回空数组
+      return []
+    }
   }
 }
 

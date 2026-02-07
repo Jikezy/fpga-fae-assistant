@@ -11,12 +11,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.20.0",
-    "@langchain/anthropic": "^0.1.0",
-    "@langchain/community": "^0.0.50",
-    "chromadb": "^1.8.0",
-    "chromadb-default-embed": "^2.14.0",
+    "@neondatabase/serverless": "^0.10.0",
     "dotenv": "^16.6.1",
-    "langchain": "^0.1.30",
     "next": "^14.2.0",
     "unpdf": "^0.11.0",
     "react": "^18.3.0",
