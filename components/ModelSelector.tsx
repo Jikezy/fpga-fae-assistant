@@ -5,12 +5,40 @@ import { useState } from 'react'
 export interface ModelOption {
   id: string
   name: string
-  provider: 'ollama' | 'zhipu' | 'qwen' | 'ernie' | 'spark'
+  provider: 'ollama' | 'zhipu' | 'qwen' | 'ernie' | 'spark' | 'anthropic'
   description: string
   isFree: boolean
 }
 
 const AVAILABLE_MODELS: ModelOption[] = [
+  {
+    id: 'anthropic-claude-3-5-sonnet-20241022',
+    name: 'Claude 3.5 Sonnet',
+    provider: 'anthropic',
+    description: '最强大的Claude模型，适合复杂任务',
+    isFree: false,
+  },
+  {
+    id: 'anthropic-claude-3-opus-20240229',
+    name: 'Claude 3 Opus',
+    provider: 'anthropic',
+    description: '最智能的模型，适合高难度分析',
+    isFree: false,
+  },
+  {
+    id: 'anthropic-claude-3-sonnet-20240229',
+    name: 'Claude 3 Sonnet',
+    provider: 'anthropic',
+    description: '平衡性能和速度的模型',
+    isFree: false,
+  },
+  {
+    id: 'anthropic-claude-3-haiku-20240307',
+    name: 'Claude 3 Haiku',
+    provider: 'anthropic',
+    description: '最快的Claude模型，快速响应',
+    isFree: false,
+  },
   {
     id: 'zhipu-glm-4-flash',
     name: '智谱 GLM-4-Flash',
