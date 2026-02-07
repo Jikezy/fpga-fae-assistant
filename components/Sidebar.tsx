@@ -3,17 +3,16 @@
 import { useState } from 'react'
 import DocumentList from './DocumentList'
 import DocumentUploader from './DocumentUploader'
-import FullReadDialog from './FullReadDialog'
 
 interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
+  onFullRead?: (filename: string) => void
 }
 
-export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
+export default function Sidebar({ isOpen, onToggle, onFullRead }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<'chat' | 'docs'>('chat')
   const [refreshKey, setRefreshKey] = useState(0)
-  const [showFullReadDialog, setShowFullReadDialog] = useState(false)
 
   return (
     <>
@@ -84,24 +83,12 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {/* 完整PDF阅读按钮 */}
-                <button
-                  onClick={() => setShowFullReadDialog(true)}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium shadow-md"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  完整PDF阅读
-                </button>
-
                 <DocumentUploader
                   onUploadSuccess={() => setRefreshKey(prev => prev + 1)}
                 />
                 <div className="border-t border-gray-200 pt-4">
                   <h3 className="text-sm font-medium text-gray-700 mb-3">已上传文档</h3>
-                  <DocumentList key={refreshKey} />
+                  <DocumentList key={refreshKey} onFullRead={onFullRead} />
                 </div>
               </div>
             )}
@@ -116,12 +103,6 @@ export default function Sidebar({ isOpen, onToggle }: SidebarProps) {
           </div>
         </div>
       </aside>
-
-      {/* 完整PDF阅读对话框 */}
-      <FullReadDialog
-        isOpen={showFullReadDialog}
-        onClose={() => setShowFullReadDialog(false)}
-      />
     </>
   )
 }

@@ -8,11 +8,16 @@ import Header from '@/components/Header'
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [currentModel, setCurrentModel] = useState('anthropic-claude-opus-4-6')
+  const [fullReadRequest, setFullReadRequest] = useState<string | null>(null)
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* 侧边栏 */}
-      <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onFullRead={(filename) => setFullReadRequest(filename)}
+      />
 
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -25,7 +30,11 @@ export default function Home() {
 
         {/* 聊天界面 */}
         <main className="flex-1 overflow-hidden">
-          <ChatInterface currentModel={currentModel} />
+          <ChatInterface
+            currentModel={currentModel}
+            fullReadRequest={fullReadRequest}
+            onFullReadComplete={() => setFullReadRequest(null)}
+          />
         </main>
       </div>
     </div>

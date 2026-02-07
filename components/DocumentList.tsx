@@ -8,10 +8,14 @@ interface DocumentInfo {
   uploadedAt: string
 }
 
+interface DocumentListProps {
+  onFullRead?: (filename: string) => void
+}
+
 type SortBy = 'time' | 'name' | 'chunks'
 type SortOrder = 'asc' | 'desc'
 
-export default function DocumentList() {
+export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set())
@@ -264,41 +268,63 @@ export default function DocumentList() {
         {sortedDocuments.map((doc) => (
           <div
             key={doc.filename}
-            className={`
-              flex items-center gap-2 p-2.5 rounded-lg border transition-all cursor-pointer
-              ${
-                selectedDocs.has(doc.filename)
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:bg-gray-50'
-              }
-            `}
-            onClick={() => toggleDocument(doc.filename)}
+            className="border border-gray-200 rounded-lg hover:border-blue-300 transition-all"
           >
-            <input
-              type="checkbox"
-              checked={selectedDocs.has(doc.filename)}
-              onChange={() => {}}
-              className="w-3.5 h-3.5 rounded border-gray-300 flex-shrink-0"
-            />
-            <svg
-              className="w-6 h-6 text-red-500 flex-shrink-0"
-              fill="currentColor"
-              viewBox="0 0 20 20"
+            <div
+              className={`
+                flex items-center gap-2 p-2.5 cursor-pointer
+                ${
+                  selectedDocs.has(doc.filename)
+                    ? 'bg-blue-50'
+                    : 'hover:bg-gray-50'
+                }
+              `}
+              onClick={() => toggleDocument(doc.filename)}
             >
-              <path
-                fillRule="evenodd"
-                d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                clipRule="evenodd"
+              <input
+                type="checkbox"
+                checked={selectedDocs.has(doc.filename)}
+                onChange={() => {}}
+                className="w-3.5 h-3.5 rounded border-gray-300 flex-shrink-0"
               />
-            </svg>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{doc.filename}</p>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span>{doc.chunks} 个片段</span>
-                <span>•</span>
-                <span>{formatTime(doc.uploadedAt)}</span>
+              <svg
+                className="w-6 h-6 text-red-500 flex-shrink-0"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{doc.filename}</p>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span>{doc.chunks} 个片段</span>
+                  <span>•</span>
+                  <span>{formatTime(doc.uploadedAt)}</span>
+                </div>
               </div>
             </div>
+            {/* 完整阅读按钮 */}
+            {onFullRead && (
+              <div className="px-2.5 pb-2.5">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onFullRead(doc.filename)
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs rounded hover:from-purple-700 hover:to-blue-700 transition-all font-medium"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  完整阅读
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

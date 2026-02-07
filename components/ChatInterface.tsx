@@ -13,9 +13,11 @@ export interface Message {
 
 interface ChatInterfaceProps {
   currentModel: string
+  fullReadRequest?: string | null
+  onFullReadComplete?: () => void
 }
 
-export default function ChatInterface({ currentModel }: ChatInterfaceProps) {
+export default function ChatInterface({ currentModel, fullReadRequest, onFullReadComplete }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -34,6 +36,123 @@ export default function ChatInterface({ currentModel }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // 处理完整阅读请求
+  useEffect(() => {
+    if (fullReadRequest) {
+      handleFullRead(fullReadRequest)
+      onFullReadComplete?.()
+    }
+  }, [fullReadRequest])
+
+  const handleFullRead = async (filename: string) => {
+    // 添加用户消息
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: `📄 完整阅读：${filename}`,
+      timestamp: new Date(),
+    }
+    setMessages((prev) => [...prev, userMessage])
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/pdf/full-read-by-name', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename,
+          question: '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。',
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('API请求失败')
+      }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let assistantMessage = ''
+      let costEstimate = ''
+
+      // 创建助手消息
+      const assistantMessageId = (Date.now() + 1).toString()
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+        },
+      ])
+
+      // 流式读取响应
+      while (reader) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') continue
+
+            try {
+              const parsed = JSON.parse(data)
+
+              if (parsed.type === 'cost_estimate') {
+                costEstimate = `💰 费用预估：¥${parsed.totalCost}（约${parsed.estimatedPages}页）\n\n`
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMessageId
+                      ? { ...m, content: costEstimate }
+                      : m
+                  )
+                )
+              } else if (parsed.type === 'content') {
+                assistantMessage += parsed.content
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMessageId
+                      ? { ...m, content: costEstimate + assistantMessage }
+                      : m
+                  )
+                )
+              } else if (parsed.type === 'error') {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantMessageId
+                      ? { ...m, content: parsed.content }
+                      : m
+                  )
+                )
+              }
+            } catch (e) {
+              console.error('解析响应失败:', e)
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('完整阅读失败:', error)
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: '抱歉，完整阅读失败。请检查网络连接或稍后重试。',
+          timestamp: new Date(),
+        },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSendMessage = async (content: string) => {
     // 添加用户消息
