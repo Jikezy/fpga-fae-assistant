@@ -1,6 +1,8 @@
 # FPGA FAE 助手
 
-一个由 AI 驱动的 FPGA 现场应用工程师（FAE）智能咨询网站，基于 Claude AI 和 RAG 向量检索技术。
+一个由 AI 驱动的 FPGA 现场应用工程师（FAE）智能咨询网站，基于智谱 AI 和 RAG 向量检索技术。
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Jikezy/fpga-fae-assistant)
 
 ## 核心特性
 
