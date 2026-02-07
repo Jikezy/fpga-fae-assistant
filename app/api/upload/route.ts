@@ -13,16 +13,16 @@ export async function GET() {
 
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
-    const documents = await vectorStore.listDocuments()
+    const documentsInfo = await vectorStore.listDocuments()
 
-    const uniqueFiles = Array.from(
-      new Set(documents.map((id) => id.split('_chunk_')[0]))
-    )
+    // listDocuments() 返回的已经是按source分组的唯一文档列表
+    const uniqueFiles = documentsInfo.map(info => info.source)
+    const totalChunks = documentsInfo.reduce((sum, info) => sum + info.chunks, 0)
 
     return NextResponse.json({
       success: true,
       documents: uniqueFiles,
-      total: documents.length,
+      total: totalChunks,
     })
   } catch (error) {
     console.error('GET /api/upload error:', error)
