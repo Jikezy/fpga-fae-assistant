@@ -122,7 +122,6 @@ ${context}
             console.log('未找到相关文档，将使用通用回答')
           }
         }
-        }
       } catch (error) {
         console.error('文档检索失败:', error)
         // 检索失败不影响正常对话，继续使用原始消息
