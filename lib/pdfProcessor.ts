@@ -29,14 +29,16 @@ export async function processPDF(
     // 动态导入 pdfjs-dist
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
-    // 禁用 worker 以避免在 serverless 环境中的问题
-    pdfjsLib.GlobalWorkerOptions.workerSrc = ''
-
     // 将 Buffer 转换为 Uint8Array
     const data = new Uint8Array(buffer)
 
-    // 加载 PDF 文档
-    const loadingTask = pdfjsLib.getDocument({ data })
+    // 加载 PDF 文档，禁用 worker
+    const loadingTask = pdfjsLib.getDocument({
+      data,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    })
     const pdfDocument = await loadingTask.promise
 
     const totalPages = pdfDocument.numPages
