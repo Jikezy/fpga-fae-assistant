@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { requireAuth } from '@/lib/auth-middleware'
 
 // 使用 Node.js runtime 而不是 Edge runtime，因为需要处理PDF
 export const runtime = 'nodejs'
 // 增加超时时间到60秒
 export const maxDuration = 60
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // 验证用户登录
+  const authResult = await requireAuth(req)
+  if (authResult.error) {
+    return authResult.error
+  }
+
   try {
     // 动态导入以避免模块加载时的初始化问题
     const { getVectorStore } = await import('@/lib/simpleVectorStore')
@@ -35,6 +42,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // 验证用户登录
+  const authResult = await requireAuth(req)
+  if (authResult.error) {
+    return authResult.error
+  }
+
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File

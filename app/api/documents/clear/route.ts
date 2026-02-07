@@ -1,8 +1,15 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getVectorStore } from '@/lib/simpleVectorStore'
+import { requireAuth } from '@/lib/auth-middleware'
 
 // 清空所有文档
-export async function POST() {
+export async function POST(req: NextRequest) {
+  // 验证用户登录
+  const authResult = await requireAuth(req)
+  if (authResult.error) {
+    return authResult.error
+  }
+
   try {
     const vectorStore = getVectorStore()
     await vectorStore.initialize()

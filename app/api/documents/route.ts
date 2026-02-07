@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getVectorStore } from '@/lib/simpleVectorStore'
+import { requireAuth } from '@/lib/auth-middleware'
 
 // 获取文档列表
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // 验证用户登录
+  const authResult = await requireAuth(req)
+  if (authResult.error) {
+    return authResult.error
+  }
+
   try {
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
@@ -32,6 +39,12 @@ export async function GET() {
 
 // 删除选中的文档
 export async function DELETE(req: NextRequest) {
+  // 验证用户登录
+  const authResult = await requireAuth(req)
+  if (authResult.error) {
+    return authResult.error
+  }
+
   try {
     const { filenames } = await req.json()
 

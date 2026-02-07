@@ -1,12 +1,19 @@
 import { NextRequest } from 'next/server'
 import { AIService } from '@/lib/ai-service'
 import { getVectorStore } from '@/lib/simpleVectorStore'
+import { requireAuth } from '@/lib/auth-middleware'
 
 // 使用 Node.js runtime
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
 export async function POST(req: NextRequest) {
+  // 验证用户登录
+  const authResult = await requireAuth(req)
+  if (authResult.error) {
+    return authResult.error
+  }
+
   try {
     const { messages, provider, model } = await req.json()
 
