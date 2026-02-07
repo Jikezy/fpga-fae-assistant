@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
           console.log('警告: 向量存储为空，没有可搜索的文档')
         } else {
           console.log('开始搜索文档，查询内容:', lastMessage.content)
-          const relevantDocs = await vectorStore.search(lastMessage.content, 5)
+          const relevantDocs = await vectorStore.search(lastMessage.content, 8) // 增加到8个片段获取更详细内容
           console.log(`检索到 ${relevantDocs.length} 个相关文档片段`)
 
           if (relevantDocs.length > 0) {
@@ -62,35 +62,57 @@ export async function POST(req: NextRequest) {
               docsBySource.get(source)!.push(doc)
             })
 
+            console.log(`文档片段来自 ${docsBySource.size} 个不同的PDF文件`)
+
             // 构建上下文信息
             const contextParts: string[] = []
-            docsBySource.forEach((docs, source) => {
-              const fileName = source.split('/').pop() || source
-              contextParts.push(`【文档：${fileName}】`)
+            let chunkIndex = 1
 
-              docs.forEach((doc, idx) => {
-                console.log(`文档片段${idx + 1}: ${source}, 页码: ${doc.metadata.page || 'N/A'}`)
-                const pageInfo = doc.metadata.page ? `（第${doc.metadata.page}页）` : ''
-                contextParts.push(`\n片段${idx + 1}${pageInfo}：\n${doc.content}`)
+            docsBySource.forEach((docs, source) => {
+              // 提取简短的文件名
+              const fileName = source.split(/[/\\]/).pop() || source
+              const shortName = fileName.length > 80 ? fileName.substring(0, 77) + '...' : fileName
+
+              contextParts.push(`\n===== 文档${docsBySource.size > 1 ? chunkIndex : ''}：${shortName} =====`)
+
+              docs.forEach((doc) => {
+                const pageInfo = doc.metadata.page ? `[第${doc.metadata.page}页]` : '[位置未知]'
+                contextParts.push(`\n${pageInfo}\n${doc.content.trim()}\n`)
               })
+
+              console.log(`文档 ${shortName}: 包含 ${docs.length} 个相关片段`)
+              chunkIndex++
             })
 
             const context = contextParts.join('\n')
 
-            // 在用户消息前添加系统提示，包含检索到的文档
+            // 在用户消息前添加系统提示
+            const docCount = docsBySource.size
+            const systemPrompt = docCount === 1
+              ? `你是一个专业的技术文档助手。用户上传了1个PDF文档，以下是从中检索到的相关内容：
+
+${context}
+
+回答要求：
+1. 基于以上内容详细回答用户的问题
+2. 引用时说"根据文档第X页"或"文档中提到"，不要说"文档1、文档2、文档3"
+3. 综合所有片段内容，给出完整、详细的回答
+4. 如果内容来自不同页面，请分别说明`
+              : `你是一个专业的技术文档助手。用户上传了${docCount}个PDF文档，以下是从中检索到的相关内容：
+
+${context}
+
+回答要求：
+1. 你看到了${docCount}个不同的文档，每个文档的内容都很重要
+2. 回答时明确区分不同文档的内容，例如："第一个文档（XX）中提到..."，"第二个文档（XX）介绍了..."
+3. 综合所有文档的内容，给出完整、详细的回答
+4. 如果用户问"有几个文档"或"讲什么内容"，请列出所有${docCount}个文档及其主要内容`
+
             enhancedMessages = [
               ...messages.slice(0, -1),
               {
                 role: 'system',
-                content: `你是一个专业的文档助手。用户上传了PDF文档，以下是从用户上传的文档中检索到的相关内容片段：
-
-${context}
-
-重要提示：
-1. 以上所有片段都来自用户上传的同一个PDF文档的不同部分
-2. 请基于这些内容详细回答用户的问题
-3. 回答时不要说"文档1、文档2"，而应该说"根据PDF的第X页"或"文档中提到"
-4. 如果是概览性问题，请综合这些片段的内容进行总结`
+                content: systemPrompt
               },
               lastMessage
             ]
@@ -99,6 +121,7 @@ ${context}
           } else {
             console.log('未找到相关文档，将使用通用回答')
           }
+        }
         }
       } catch (error) {
         console.error('文档检索失败:', error)

@@ -66,6 +66,7 @@ export class SimpleVectorStore {
   /**
    * 简单的文本相似度搜索
    * 使用关键词匹配和文本重叠度
+   * 支持多文档均衡检索
    */
   async search(query: string, topK: number = 5): Promise<Document[]> {
     const sql = getSql()
@@ -100,41 +101,81 @@ export class SimpleVectorStore {
 
       console.log(`[搜索] 从数据库加载了 ${documents.length} 个文档片段`)
 
-      // 如果是泛泛的询问（比如"pdf讲的什么"），返回前面的文档片段作为概览
-      const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about']
+      // 按文档来源分组
+      const docsBySource = new Map<string, Document[]>()
+      documents.forEach(doc => {
+        const source = doc.metadata.source
+        if (!docsBySource.has(source)) {
+          docsBySource.set(source, [])
+        }
+        docsBySource.get(source)!.push(doc)
+      })
+
+      console.log(`[搜索] 共有 ${docsBySource.size} 个不同的文档文件`)
+
+      // 如果是泛泛的询问（比如"有几个文档"、"pdf讲的什么"），从每个文档都取一些片段
+      const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about', '几个', '多少', '有哪些']
       const isGeneralQuestion = generalQuestions.some(keyword =>
         query.toLowerCase().includes(keyword)
-      ) && query.length < 20
+      ) && query.length < 30
 
       if (isGeneralQuestion) {
-        console.log('检测到泛泛询问，返回文档概览')
-        return documents.slice(0, Math.min(topK, documents.length))
+        console.log('[搜索] 检测到概览性询问，从每个文档取片段')
+        const perDocLimit = Math.max(2, Math.floor(topK / docsBySource.size))
+        const results: Document[] = []
+
+        docsBySource.forEach((docs, source) => {
+          // 从每个文档取前N个片段（开头部分通常包含概述）
+          results.push(...docs.slice(0, perDocLimit))
+        })
+
+        console.log(`[搜索] 返回 ${results.length} 个文档片段（来自 ${docsBySource.size} 个文档）`)
+        return results.slice(0, topK * 2) // 概览时返回更多片段
       }
 
       const queryTerms = this.tokenize(query.toLowerCase())
-      const results: Array<{ doc: Document; score: number }> = []
+      const resultsBySource = new Map<string, Array<{ doc: Document; score: number }>>()
 
-      for (const doc of documents) {
-        const docTerms = this.tokenize(doc.content.toLowerCase())
-        const score = this.calculateSimilarity(queryTerms, docTerms)
+      // 对每个文档分别计算相似度
+      docsBySource.forEach((docs, source) => {
+        const scores: Array<{ doc: Document; score: number }> = []
 
-        if (score > 0.01) {
-          results.push({ doc, score })
-        }
+        docs.forEach(doc => {
+          const docTerms = this.tokenize(doc.content.toLowerCase())
+          const score = this.calculateSimilarity(queryTerms, docTerms)
+
+          if (score > 0.01) {
+            scores.push({ doc, score })
+          }
+        })
+
+        // 按相似度排序
+        scores.sort((a, b) => b.score - a.score)
+        resultsBySource.set(source, scores)
+      })
+
+      // 从每个文档取最相关的片段，确保多文档均衡
+      const finalResults: Document[] = []
+      const perDocLimit = Math.max(3, Math.floor(topK / docsBySource.size))
+
+      resultsBySource.forEach((scores, source) => {
+        const topFromThisDoc = scores.slice(0, perDocLimit).map(s => s.doc)
+        finalResults.push(...topFromThisDoc)
+        console.log(`[搜索] 从文档 ${source} 中选取了 ${topFromThisDoc.length} 个最相关片段`)
+      })
+
+      // 如果没找到足够的结果，从每个文档返回开头片段作为fallback
+      if (finalResults.length < 3 && documents.length > 0) {
+        console.log('[搜索] 未找到足够的匹配文档，从每个文档取开头片段作为fallback')
+        const fallbackResults: Document[] = []
+        docsBySource.forEach((docs, source) => {
+          fallbackResults.push(...docs.slice(0, 2))
+        })
+        return fallbackResults.slice(0, topK)
       }
 
-      // 按相似度排序并返回前 topK 个结果
-      results.sort((a, b) => b.score - a.score)
-
-      const topResults = results.slice(0, topK).map(r => r.doc)
-
-      // 如果没找到足够的结果，返回前几个文档作为fallback
-      if (topResults.length < 3 && documents.length > 0) {
-        console.log('未找到足够的匹配文档，返回前几个文档作为fallback')
-        return documents.slice(0, Math.min(topK, documents.length))
-      }
-
-      return topResults
+      console.log(`[搜索] 最终返回 ${finalResults.length} 个片段（来自 ${docsBySource.size} 个文档）`)
+      return finalResults.slice(0, topK * 2) // 返回更多片段以获得更详细的上下文
     } catch (error) {
       console.error('搜索文档失败:', error)
       throw error
