@@ -25,6 +25,42 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // 获取用户的API配置
+    const { getSql } = await import('@/lib/db-schema')
+    const sql = getSql()
+    const userConfig = await sql`
+      SELECT anthropic_api_key, anthropic_base_url, role
+      FROM users
+      WHERE id = ${authResult.user.id}
+    `
+
+    if (userConfig.length === 0) {
+      return NextResponse.json(
+        { error: '用户不存在' },
+        { status: 404 }
+      )
+    }
+
+    const user = userConfig[0] as any
+
+    // 如果是普通用户且未配置API Key，返回错误
+    if (user.role !== 'admin' && !user.anthropic_api_key) {
+      return NextResponse.json({
+        error: 'API配置缺失',
+        message: '请先在设置中配置您的云雾AI API Key',
+        needsConfig: true,
+      }, { status: 403 })
+    }
+
+    // 决定使用哪个API Key和Base URL
+    let apiKey = user.anthropic_api_key
+    let baseURL = user.anthropic_base_url || 'https://yunwu.ai'
+
+    if (user.role === 'admin' && !apiKey) {
+      apiKey = process.env.ANTHROPIC_API_KEY
+      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
+    }
+
     // 从数据库获取该文件的所有文档片段
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
@@ -65,6 +101,8 @@ export async function POST(req: NextRequest) {
     const aiService = new AIService({
       provider: 'anthropic',
       model: 'claude-opus-4-6',
+      apiKey,
+      baseURL,
     })
 
     const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'

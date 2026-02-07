@@ -31,14 +31,13 @@ export class AIService {
 
   constructor(config?: Partial<AIServiceConfig>) {
     // 从环境变量读取配置
-    const provider = (process.env.AI_PROVIDER || 'ollama') as AIServiceConfig['provider']
+    const provider = (config?.provider || process.env.AI_PROVIDER || 'ollama') as AIServiceConfig['provider']
 
     this.config = {
       provider,
-      apiKey: this.getApiKey(provider),
-      baseURL: this.getBaseURL(provider),
-      model: this.getDefaultModel(provider),
-      ...config,
+      apiKey: config?.apiKey || this.getApiKey(provider),
+      baseURL: config?.baseURL || this.getBaseURL(provider),
+      model: config?.model || this.getDefaultModel(provider),
     }
 
     // 初始化 Anthropic 客户端
