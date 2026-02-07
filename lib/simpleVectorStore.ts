@@ -114,10 +114,15 @@ export class SimpleVectorStore {
       console.log(`[搜索] 共有 ${docsBySource.size} 个不同的文档文件`)
 
       // 如果是泛泛的询问（比如"有几个文档"、"pdf讲的什么"），从每个文档都取一些片段
-      const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about', '几个', '多少', '有哪些']
-      const isGeneralQuestion = generalQuestions.some(keyword =>
+      const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about', '几个', '多少', '有哪些', '上传', '文档']
+      const matchedKeywords = generalQuestions.filter(keyword =>
         query.toLowerCase().includes(keyword)
-      ) && query.length < 30
+      )
+      // 如果匹配了2个或以上关键词，或者问题中包含"几个"/"多少"，就认为是概览性问题
+      const isGeneralQuestion = matchedKeywords.length >= 2 ||
+                                query.includes('几个') ||
+                                query.includes('多少') ||
+                                query.includes('有哪些')
 
       if (isGeneralQuestion) {
         console.log('[搜索] 检测到概览性询问，从每个文档取片段')
