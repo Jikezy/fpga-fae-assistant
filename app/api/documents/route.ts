@@ -7,27 +7,14 @@ export async function GET() {
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
 
-    // listDocuments() 现在直接返回文件名列表（已去重）
-    const filenames = await vectorStore.listDocuments()
+    // listDocuments() 返回包含文件名、上传时间和片段数的数组
+    const documentsInfo = await vectorStore.listDocuments()
 
-    // 为每个文件统计片段数量
-    const documents = await Promise.all(
-      filenames.map(async (filename) => {
-        // 从数据库查询该文件的片段数量
-        const sql = (await import('@/lib/db-schema')).getSql()
-        const result = await sql`
-          SELECT COUNT(*) as count
-          FROM documents
-          WHERE source = ${filename}
-        `
-        const chunks = Number(result[0]?.count || 0)
-
-        return {
-          filename,
-          chunks,
-        }
-      })
-    )
+    const documents = documentsInfo.map(info => ({
+      filename: info.source,
+      chunks: info.chunks,
+      uploadedAt: info.uploadedAt.toISOString(),
+    }))
 
     return NextResponse.json({
       success: true,

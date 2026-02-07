@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
 
         // 检查是否有文档
         const allDocs = await vectorStore.listDocuments()
-        console.log(`向量存储中共有 ${allDocs.length} 个文档文件:`, allDocs)
+        console.log(`向量存储中共有 ${allDocs.length} 个文档文件:`, allDocs.map(d => d.source))
 
         if (allDocs.length === 0) {
           console.log('警告: 向量存储为空，没有可搜索的文档')

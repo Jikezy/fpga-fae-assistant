@@ -5,13 +5,19 @@ import { useState, useEffect } from 'react'
 interface DocumentInfo {
   filename: string
   chunks: number
+  uploadedAt: string
 }
+
+type SortBy = 'time' | 'name' | 'chunks'
+type SortOrder = 'asc' | 'desc'
 
 export default function DocumentList() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
+  const [sortBy, setSortBy] = useState<SortBy>('time')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
   // 加载文档列表
   const loadDocuments = async () => {
@@ -27,6 +33,54 @@ export default function DocumentList() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // 排序文档
+  const sortedDocuments = [...documents].sort((a, b) => {
+    let compareResult = 0
+
+    if (sortBy === 'time') {
+      compareResult = new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+    } else if (sortBy === 'name') {
+      compareResult = a.filename.localeCompare(b.filename)
+    } else if (sortBy === 'chunks') {
+      compareResult = a.chunks - b.chunks
+    }
+
+    return sortOrder === 'asc' ? compareResult : -compareResult
+  })
+
+  // 切换排序方式
+  const toggleSort = (newSortBy: SortBy) => {
+    if (sortBy === newSortBy) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(newSortBy)
+      setSortOrder('desc')
+    }
+  }
+
+  // 格式化时间
+  const formatTime = (isoString: string) => {
+    const date = new Date(isoString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return '刚刚'
+    if (diffMins < 60) return `${diffMins}分钟前`
+    if (diffHours < 24) return `${diffHours}小时前`
+    if (diffDays < 7) return `${diffDays}天前`
+
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
   useEffect(() => {
@@ -142,6 +196,35 @@ export default function DocumentList() {
 
   return (
     <div className="space-y-4">
+      {/* 排序栏 */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-gray-500">排序:</span>
+        <button
+          onClick={() => toggleSort('time')}
+          className={`px-2 py-1 rounded transition-colors ${
+            sortBy === 'time' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          时间 {sortBy === 'time' && (sortOrder === 'desc' ? '↓' : '↑')}
+        </button>
+        <button
+          onClick={() => toggleSort('name')}
+          className={`px-2 py-1 rounded transition-colors ${
+            sortBy === 'name' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          名称 {sortBy === 'name' && (sortOrder === 'desc' ? '↓' : '↑')}
+        </button>
+        <button
+          onClick={() => toggleSort('chunks')}
+          className={`px-2 py-1 rounded transition-colors ${
+            sortBy === 'chunks' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          片段数 {sortBy === 'chunks' && (sortOrder === 'desc' ? '↓' : '↑')}
+        </button>
+      </div>
+
       {/* 操作栏 */}
       <div className="flex items-center justify-between text-xs">
         <label className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors">
@@ -178,7 +261,7 @@ export default function DocumentList() {
 
       {/* 文档列表 */}
       <div className="space-y-2 max-h-96 overflow-y-auto">
-        {documents.map((doc) => (
+        {sortedDocuments.map((doc) => (
           <div
             key={doc.filename}
             className={`
@@ -210,7 +293,11 @@ export default function DocumentList() {
             </svg>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">{doc.filename}</p>
-              <p className="text-xs text-gray-500">{doc.chunks} 个片段</p>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>{doc.chunks} 个片段</span>
+                <span>•</span>
+                <span>{formatTime(doc.uploadedAt)}</span>
+              </div>
             </div>
           </div>
         ))}

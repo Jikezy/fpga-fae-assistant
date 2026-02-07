@@ -252,16 +252,23 @@ export class SimpleVectorStore {
     }
   }
 
-  async listDocuments(): Promise<string[]> {
+  async listDocuments(): Promise<Array<{ source: string; uploadedAt: Date; chunks: number }>> {
     const sql = getSql()
     try {
       const rows = await sql`
-        SELECT source, MAX(created_at) as latest_created_at
+        SELECT
+          source,
+          COUNT(*) as chunks,
+          MIN(created_at) as uploaded_at
         FROM documents
         GROUP BY source
-        ORDER BY latest_created_at DESC
+        ORDER BY uploaded_at DESC
       `
-      return rows.map((row: any) => row.source)
+      return rows.map((row: any) => ({
+        source: row.source,
+        uploadedAt: new Date(row.uploaded_at),
+        chunks: Number(row.chunks)
+      }))
     } catch (error) {
       console.error('列出文档失败:', error)
       // 如果数据库查询失败，返回空数组
