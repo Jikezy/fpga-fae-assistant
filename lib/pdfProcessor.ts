@@ -1,5 +1,10 @@
-import pdf from 'pdf-parse'
 import { Document } from './simpleVectorStore'
+
+// 延迟导入 pdf-parse 以避免在模块加载时触发问题
+async function getPdfParser() {
+  const pdf = await import('pdf-parse')
+  return pdf.default
+}
 
 export interface ProcessedPDF {
   title: string
@@ -27,7 +32,8 @@ export async function processPDF(
 
     console.log(`开始处理PDF: ${filename}, 大小: ${buffer.length} 字节`)
 
-    // 解析PDF - 确保传递的是 Buffer 对象，不传递任何文件路径相关的选项
+    // 动态导入并使用 pdf-parse
+    const pdf = await getPdfParser()
     const data = await pdf(buffer)
 
     console.log(`PDF解析成功: ${filename}, 页数: ${data.numpages}, 文本长度: ${data.text.length}`)
