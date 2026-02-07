@@ -38,19 +38,6 @@ export async function initializeDatabase() {
       )
     `
 
-    // 创建PDF文件表（存储原始PDF）
-    await sql`
-      CREATE TABLE IF NOT EXISTS pdf_files (
-        id TEXT PRIMARY KEY,
-        filename TEXT NOT NULL,
-        file_data BYTEA NOT NULL,
-        file_size INTEGER NOT NULL,
-        total_pages INTEGER,
-        uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `
-
     // 创建文档表
     await sql`
       CREATE TABLE IF NOT EXISTS documents (
@@ -59,7 +46,6 @@ export async function initializeDatabase() {
         source TEXT NOT NULL,
         page INTEGER,
         title TEXT,
-        pdf_file_id TEXT REFERENCES pdf_files(id) ON DELETE CASCADE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `
@@ -88,15 +74,7 @@ export async function initializeDatabase() {
     `
 
     await sql`
-      CREATE INDEX IF NOT EXISTS idx_pdf_files_filename ON pdf_files(filename)
-    `
-
-    await sql`
       CREATE INDEX IF NOT EXISTS idx_documents_source ON documents(source)
-    `
-
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_documents_pdf_file_id ON documents(pdf_file_id)
     `
 
     await sql`
