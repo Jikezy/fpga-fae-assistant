@@ -52,24 +52,45 @@ export async function POST(req: NextRequest) {
           console.log(`检索到 ${relevantDocs.length} 个相关文档片段`)
 
           if (relevantDocs.length > 0) {
+            // 按文档来源分组
+            const docsBySource = new Map<string, typeof relevantDocs>()
+            relevantDocs.forEach(doc => {
+              const source = doc.metadata.source
+              if (!docsBySource.has(source)) {
+                docsBySource.set(source, [])
+              }
+              docsBySource.get(source)!.push(doc)
+            })
+
             // 构建上下文信息
-            const context = relevantDocs
-              .map((doc, idx) => {
-                console.log(`文档${idx + 1}: ${doc.metadata.source}, 内容片段: ${doc.content.substring(0, 100)}...`)
-                return `[文档${idx + 1}] 来源: ${doc.metadata.source}, 页码: ${doc.metadata.page || 'N/A'}\n${doc.content}`
+            const contextParts: string[] = []
+            docsBySource.forEach((docs, source) => {
+              const fileName = source.split('/').pop() || source
+              contextParts.push(`【文档：${fileName}】`)
+
+              docs.forEach((doc, idx) => {
+                console.log(`文档片段${idx + 1}: ${source}, 页码: ${doc.metadata.page || 'N/A'}`)
+                const pageInfo = doc.metadata.page ? `（第${doc.metadata.page}页）` : ''
+                contextParts.push(`\n片段${idx + 1}${pageInfo}：\n${doc.content}`)
               })
-              .join('\n\n')
+            })
+
+            const context = contextParts.join('\n')
 
             // 在用户消息前添加系统提示，包含检索到的文档
             enhancedMessages = [
               ...messages.slice(0, -1),
               {
                 role: 'system',
-                content: `你是一个专业的文档助手。用户上传了PDF文档，以下是从文档中检索到的相关内容：
+                content: `你是一个专业的文档助手。用户上传了PDF文档，以下是从用户上传的文档中检索到的相关内容片段：
 
 ${context}
 
-请基于上述文档内容详细回答用户的问题。如果文档内容足够，请总结主要内容。`
+重要提示：
+1. 以上所有片段都来自用户上传的同一个PDF文档的不同部分
+2. 请基于这些内容详细回答用户的问题
+3. 回答时不要说"文档1、文档2"，而应该说"根据PDF的第X页"或"文档中提到"
+4. 如果是概览性问题，请综合这些片段的内容进行总结`
               },
               lastMessage
             ]
