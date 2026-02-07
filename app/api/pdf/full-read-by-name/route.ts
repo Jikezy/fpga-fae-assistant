@@ -65,9 +65,6 @@ export async function POST(req: NextRequest) {
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
 
-    const { getSql } = await import('@/lib/db-schema')
-    const sql = getSql()
-
     const documents = await sql`
       SELECT content, page
       FROM documents
