@@ -7,7 +7,7 @@ import Header from '@/components/Header'
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [currentModel, setCurrentModel] = useState('anthropic-claude-3-5-sonnet-20241022')
+  const [currentModel, setCurrentModel] = useState('anthropic-claude-opus-4-6')
 
   return (
     <div className="flex h-screen bg-gray-50">
