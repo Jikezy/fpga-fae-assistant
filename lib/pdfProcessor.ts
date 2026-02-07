@@ -15,11 +15,22 @@ export async function processPDF(
   filename: string
 ): Promise<ProcessedPDF> {
   try {
-    // 解析PDF - 确保传递的是 Buffer 对象
-    const data = await pdf(buffer, {
-      // 不要使用文件路径，只使用 buffer
-      max: 0, // 不限制页数
-    })
+    // 验证 buffer 是否有效
+    if (!buffer || buffer.length === 0) {
+      throw new Error('无效的PDF文件数据')
+    }
+
+    // 验证是否为PDF文件
+    if (!isPDF(buffer)) {
+      throw new Error('文件不是有效的PDF格式')
+    }
+
+    console.log(`开始处理PDF: ${filename}, 大小: ${buffer.length} 字节`)
+
+    // 解析PDF - 确保传递的是 Buffer 对象，不传递任何文件路径相关的选项
+    const data = await pdf(buffer)
+
+    console.log(`PDF解析成功: ${filename}, 页数: ${data.numpages}, 文本长度: ${data.text.length}`)
 
     // 分割文本为段落（每500字符一个片段，保持上下文）
     const chunkSize = 500
@@ -35,6 +46,8 @@ export async function processPDF(
         chunks.push(chunk)
       }
     }
+
+    console.log(`PDF分块完成: ${filename}, 共${chunks.length}个片段`)
 
     // 创建文档对象
     const documents: Document[] = chunks.map((chunk, index) => ({
@@ -53,8 +66,12 @@ export async function processPDF(
       documents,
     }
   } catch (error) {
-    console.error('PDF处理失败:', error)
-    throw new Error('PDF文件处理失败，请确保文件格式正确')
+    console.error('PDF处理失败:', filename, error)
+    // 提供更详细的错误信息
+    if (error instanceof Error) {
+      throw new Error(`PDF文件处理失败: ${error.message}`)
+    }
+    throw new Error('PDF文件处理失败，请确保文件格式正确且未损坏')
   }
 }
 

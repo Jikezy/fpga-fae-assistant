@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// 使用 Node.js runtime 而不是 Edge runtime，因为需要处理PDF
+export const runtime = 'nodejs'
+// 增加超时时间到60秒
+export const maxDuration = 60
+
 export async function GET() {
   try {
     // 动态导入以避免模块加载时的初始化问题

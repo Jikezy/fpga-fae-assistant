@@ -36,12 +36,10 @@ next-env.d.ts
 # 向量数据库
 /chroma_data
 /vector_store
+/chroma
 
 # 上传的文件
 /uploads
-
-# ChromaDB 数据
-/chroma/*.sqlite3
 
 # Claude 本地配置
 .claude/settings.local.json

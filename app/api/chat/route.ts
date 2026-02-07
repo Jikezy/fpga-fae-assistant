@@ -2,6 +2,10 @@ import { NextRequest } from 'next/server'
 import { AIService } from '@/lib/ai-service'
 import { getVectorStore } from '@/lib/simpleVectorStore'
 
+// 使用 Node.js runtime
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   try {
     const { messages, provider, model } = await req.json()
