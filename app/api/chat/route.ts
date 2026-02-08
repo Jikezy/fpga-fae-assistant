@@ -144,38 +144,40 @@ export async function POST(req: NextRequest) {
 
             const context = contextParts.join('\n')
 
-            // 在用户消息前添加系统提示
+            // 构建增强的用户消息（把 context 拼接到用户问题前面）
             const docCount = docsBySource.size
-            const systemPrompt = docCount === 1
-              ? `你是一个专业的技术文档助手。用户上传了1个PDF文档，以下是从中检索到的相关内容：
+            const enhancedUserMessage = docCount === 1
+              ? `【参考文档】用户上传了1个PDF文档，以下是相关内容：
 
 ${context}
 
-回答要求：
-1. 基于以上内容详细回答用户的问题
-2. 引用时说"根据文档第X页"或"文档中提到"，不要说"文档1、文档2、文档3"
-3. 综合所有片段内容，给出完整、详细的回答
-4. 如果内容来自不同页面，请分别说明`
-              : `你是一个专业的技术文档助手。用户上传了${docCount}个PDF文档，以下是从中检索到的相关内容：
+【用户问题】${lastMessage.content}
+
+【回答要求】
+1. 基于以上PDF文档内容详细回答用户的问题
+2. 引用时说"根据文档第X页"或"文档中提到"
+3. 综合所有片段内容，给出完整、详细的回答`
+              : `【参考文档】用户上传了${docCount}个PDF文档，以下是相关内容：
 
 ${context}
 
-回答要求：
+【用户问题】${lastMessage.content}
+
+【回答要求】
 1. 你看到了${docCount}个不同的文档，每个文档的内容都很重要
-2. 回答时明确区分不同文档的内容，例如："第一个文档（XX）中提到..."，"第二个文档（XX）介绍了..."
-3. 综合所有文档的内容，给出完整、详细的回答
-4. 如果用户问"有几个文档"或"讲什么内容"，请列出所有${docCount}个文档及其主要内容`
+2. 回答时明确区分不同文档的内容，例如："第一个文档（XX）中提到..."
+3. 综合所有文档的内容，给出完整、详细的回答`
 
+            // 替换最后一条用户消息
             enhancedMessages = [
               ...messages.slice(0, -1),
               {
-                role: 'system',
-                content: systemPrompt
-              },
-              lastMessage
+                role: 'user',
+                content: enhancedUserMessage
+              }
             ]
 
-            console.log('已将检索到的文档添加到上下文中')
+            console.log('已将检索到的文档添加到用户消息中')
           } else {
             // 未检索到相关内容，但告诉AI用户有哪些文档
             console.log('未找到相关文档，但会告诉AI用户有哪些文档可用')
@@ -184,13 +186,13 @@ ${context}
               return `- ${fileName} (${d.chunks}个片段)`
             }).join('\n')
 
-            const systemPrompt = `你是一个专业的技术文档助手。用户上传了${allDocs.length}个PDF文档：
+            const enhancedUserMessage = `【文档信息】用户上传了${allDocs.length}个PDF文档：
 
 ${fileList}
 
-但针对当前问题："${lastMessage.content}"，我没有找到特别相关的内容片段。
+【用户问题】${lastMessage.content}
 
-请告诉用户：
+【说明】针对当前问题，我没有找到特别相关的内容片段。请告诉用户：
 1. 你已经上传了这些文档
 2. 当前问题可能需要更具体的关键词，或者可以使用"完整阅读"功能来深入分析整个文档
 3. 如果用户想了解文档内容，建议使用侧边栏的"完整阅读"按钮`
@@ -198,10 +200,9 @@ ${fileList}
             enhancedMessages = [
               ...messages.slice(0, -1),
               {
-                role: 'system',
-                content: systemPrompt
-              },
-              lastMessage
+                role: 'user',
+                content: enhancedUserMessage
+              }
             ]
           }
         }
