@@ -7,7 +7,7 @@ import Header from '@/components/Header'
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [currentModel, setCurrentModel] = useState('anthropic-claude-opus-4-6')
+  const [currentModel, setCurrentModel] = useState('zhipu-glm-4-flash')
   const [fullReadRequest, setFullReadRequest] = useState<string | null>(null)
 
   return (

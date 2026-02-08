@@ -19,10 +19,10 @@ const AVAILABLE_MODELS: ModelOption[] = [
     isFree: false,
   },
   {
-    id: 'anthropic-claude-3-5-sonnet-20241022',
-    name: 'Claude 3.5 Sonnet',
-    provider: 'anthropic',
-    description: '强大平衡的模型，适合日常使用',
+    id: 'zhipu-glm-4-plus',
+    name: '智谱 GLM-4-Plus',
+    provider: 'zhipu',
+    description: '智谱最强模型，复杂推理能力',
     isFree: false,
   },
   {
