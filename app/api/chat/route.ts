@@ -35,31 +35,38 @@ export async function POST(req: NextRequest) {
 
     const user = userConfig[0] as any
 
-    // 如果是普通用户且未配置API Key，返回错误
-    if (user.role !== 'admin' && !user.anthropic_api_key) {
-      return new Response(
-        JSON.stringify({
-          error: 'API配置缺失',
-          message: '请先配置您的云雾AI API Key',
-          needsConfig: true,
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
+    // 根据 provider 决定 API Key 和 Base URL
+    let apiKey: string | undefined
+    let baseURL: string | undefined
+
+    if (provider === 'anthropic') {
+      // Anthropic/云雾AI：优先使用用户配置，管理员可使用系统默认
+      if (user.role !== 'admin' && !user.anthropic_api_key) {
+        return new Response(
+          JSON.stringify({
+            error: 'API配置缺失',
+            message: '请先配置您的云雾AI API Key',
+            needsConfig: true,
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      apiKey = user.anthropic_api_key
+      baseURL = user.anthropic_base_url || 'https://yunwu.ai'
+
+      if (user.role === 'admin' && !apiKey) {
+        apiKey = process.env.ANTHROPIC_API_KEY
+        baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
+      }
+    } else {
+      // 其他 provider（智谱、通义千问等）：使用环境变量配置
+      // 不传递 apiKey 和 baseURL，让 AIService 从环境变量获取
+      apiKey = undefined
+      baseURL = undefined
     }
 
-    // 决定使用哪个API Key和Base URL
-    // 管理员：如果有个人配置就用个人的，否则用系统默认
-    // 普通用户：必须用自己的配置
-    let apiKey = user.anthropic_api_key
-    let baseURL = user.anthropic_base_url || 'https://yunwu.ai'
-
-    if (user.role === 'admin' && !apiKey) {
-      // 管理员使用系统默认配置
-      apiKey = process.env.ANTHROPIC_API_KEY
-      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
-    }
-
-    // 创建 AI 服务实例，使用用户的配置
+    // 创建 AI 服务实例
     const aiService = new AIService({
       provider: provider || 'anthropic',
       model,
