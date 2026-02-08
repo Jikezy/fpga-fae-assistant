@@ -39,7 +39,7 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-4">
-      <div className="flex gap-3 items-end bg-gray-50 rounded-2xl p-3 border border-gray-200 focus-within:border-blue-500 transition-colors">
+      <div className="flex gap-3 items-end bg-white/20 backdrop-blur-xl rounded-3xl p-4 border border-white/30 shadow-2xl focus-within:border-white/60 transition-all">
         <textarea
           ref={textareaRef}
           value={input}
@@ -48,12 +48,12 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
           placeholder="输入你的问题... (Shift+Enter换行)"
           disabled={disabled}
           rows={1}
-          className="flex-1 bg-transparent resize-none outline-none text-gray-800 placeholder-gray-400 max-h-[200px]"
+          className="flex-1 bg-transparent resize-none outline-none text-white placeholder-white/50 max-h-[200px] font-medium"
         />
         {isGenerating ? (
           <button
             onClick={onStop}
-            className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex-shrink-0"
+            className="p-2.5 bg-gradient-to-br from-red-500 to-pink-600 text-white rounded-2xl hover:shadow-xl transition-all flex-shrink-0 shadow-lg"
             aria-label="停止生成"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -64,7 +64,7 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
           <button
             onClick={handleSubmit}
             disabled={disabled || !input.trim()}
-            className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            className="p-2.5 bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-2xl hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0 shadow-lg"
             aria-label="发送消息"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,7 +73,7 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
           </button>
         )}
       </div>
-      <p className="text-xs text-gray-500 mt-2 text-center">
+      <p className="text-xs text-white/60 mt-2 text-center">
         AI可能会出错，请核实重要信息
       </p>
     </div>

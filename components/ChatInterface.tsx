@@ -323,7 +323,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
   }
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-transparent">
       {/* 消息列表 */}
       <div
         ref={messagesContainerRef}
@@ -335,7 +335,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       </div>
 
       {/* 输入框 */}
-      <div className="border-t border-gray-200">
+      <div className="border-t border-white/10">
         <ChatInput
           onSend={handleSendMessage}
           disabled={isLoading}

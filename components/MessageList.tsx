@@ -22,7 +22,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           }`}
         >
           {message.role === 'assistant' && (
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
@@ -32,14 +32,14 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           <div
             className={`flex-1 max-w-3xl ${
               message.role === 'user'
-                ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-3'
-                : 'bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3'
+                ? 'bg-gradient-to-br from-pink-500 to-purple-600 text-white rounded-3xl rounded-tr-md px-5 py-4 shadow-xl backdrop-blur-xl'
+                : 'bg-white/20 backdrop-blur-xl rounded-3xl rounded-tl-md px-5 py-4 border border-white/30 shadow-xl'
             }`}
           >
             {message.role === 'user' ? (
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <p className="whitespace-pre-wrap font-medium">{message.content}</p>
             ) : (
-              <div className="markdown-body prose prose-sm max-w-none text-gray-900">
+              <div className="markdown-body prose prose-sm max-w-none text-white">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
@@ -52,9 +52,10 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                           language={match[1]}
                           PreTag="div"
                           customStyle={{
-                            background: '#fafafa',
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '0.5rem',
+                            background: 'rgba(255, 255, 255, 0.15)',
+                            backdropFilter: 'blur(10px)',
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            borderRadius: '1rem',
                             padding: '1rem',
                             fontSize: '0.875rem',
                           }}
@@ -62,7 +63,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                           {String(children).replace(/\n$/, '')}
                         </SyntaxHighlighter>
                       ) : (
-                        <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm">
+                        <code className="bg-white/20 text-white px-2 py-0.5 rounded-lg text-sm backdrop-blur-sm">
                           {children}
                         </code>
                       )
@@ -70,7 +71,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                     table({ children }: any) {
                       return (
                         <div className="overflow-x-auto my-4">
-                          <table className="min-w-full border border-gray-300 rounded-lg">
+                          <table className="min-w-full border border-white/30 rounded-2xl overflow-hidden backdrop-blur-sm">
                             {children}
                           </table>
                         </div>
@@ -78,21 +79,21 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                     },
                     thead({ children }: any) {
                       return (
-                        <thead className="bg-gray-100">
+                        <thead className="bg-white/20 backdrop-blur-sm">
                           {children}
                         </thead>
                       )
                     },
                     th({ children }: any) {
                       return (
-                        <th className="px-4 py-2 text-left text-sm font-semibold text-gray-900 border-b-2 border-gray-300">
+                        <th className="px-4 py-2 text-left text-sm font-semibold text-white border-b-2 border-white/30">
                           {children}
                         </th>
                       )
                     },
                     td({ children }: any) {
                       return (
-                        <td className="px-4 py-2 text-sm text-gray-800 border-b border-gray-200">
+                        <td className="px-4 py-2 text-sm text-white/90 border-b border-white/20">
                           {children}
                         </td>
                       )
@@ -112,8 +113,8 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           </div>
 
           {message.role === 'user' && (
-            <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-lg">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
@@ -123,16 +124,16 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
 
       {isLoading && (
         <div className="flex gap-4 justify-start">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-lg">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
-          <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3">
+          <div className="bg-white/20 backdrop-blur-xl rounded-3xl rounded-tl-md px-5 py-4 border border-white/30 shadow-xl">
             <div className="flex gap-1">
-              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-              <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+              <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+              <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+              <span className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
             </div>
           </div>
         </div>

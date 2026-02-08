@@ -11,7 +11,12 @@ export default function Home() {
   const [fullReadRequest, setFullReadRequest] = useState<string | null>(null)
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 relative overflow-hidden">
+      {/* 动态背景效果 */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(120,119,198,0.3),transparent_50%)]"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(237,100,166,0.3),transparent_50%)]"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_20%,rgba(139,92,246,0.3),transparent_40%)]"></div>
+
       {/* 侧边栏 */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -20,7 +25,7 @@ export default function Home() {
       />
 
       {/* 主内容区 */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative z-10">
         {/* 顶部导航 */}
         <Header
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}
