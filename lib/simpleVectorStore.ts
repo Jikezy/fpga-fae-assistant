@@ -158,7 +158,8 @@ export class SimpleVectorStore {
           const docTerms = this.tokenize(doc.content.toLowerCase())
           const score = this.calculateSimilarity(queryTerms, docTerms)
 
-          if (score > 0.01) {
+          // 降低阈值，确保能检索到更多相关文档
+          if (score > 0.005) {
             scores.push({ doc, score })
           }
         })
@@ -173,7 +174,11 @@ export class SimpleVectorStore {
       const perDocLimit = Math.max(3, Math.floor(topK / docsBySource.size))
 
       resultsBySource.forEach((scores, source) => {
-        const topFromThisDoc = scores.slice(0, perDocLimit).map(s => s.doc)
+        console.log(`[搜索] 文档 ${source} 共有 ${scores.length} 个匹配片段`)
+        const topFromThisDoc = scores.slice(0, perDocLimit).map(s => {
+          console.log(`  - 片段得分: ${s.score.toFixed(4)}`)
+          return s.doc
+        })
         finalResults.push(...topFromThisDoc)
         console.log(`[搜索] 从文档 ${source} 中选取了 ${topFromThisDoc.length} 个最相关片段`)
       })

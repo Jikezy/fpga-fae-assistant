@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
 
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
-    const documentsInfo = await vectorStore.listDocuments()
+    // 只获取当前用户的文档
+    const documentsInfo = await vectorStore.listDocuments(authResult.user.id)
 
     // listDocuments() 返回的已经是按source分组的唯一文档列表
     const uniqueFiles = documentsInfo.map(info => info.source)
