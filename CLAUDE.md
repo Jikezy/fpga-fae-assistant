@@ -200,19 +200,33 @@ const stream = new ReadableStream({
 
 ## Deployment
 
-### 部署架构
+### ⚠️ 重要：本项目为云端部署
+
+**本项目已部署在云端，不在本地运行！**
 
 - **代码托管**: GitHub (https://github.com/Jikezy/fpga-fae-assistant)
 - **自动部署**: 代码推送到 main 分支后自动触发部署
 - **数据库**: PostgreSQL (Neon Serverless)
-- **部署平台**: Spaceship 或 Vercel
+- **部署平台**: Spaceship
 
-### 部署流程
+### 标准工作流程
 
-1. 本地开发并测试
-2. Git 提交代码: `git add . && git commit -m "message" && git push`
-3. 云端平台自动拉取 GitHub 最新代码并重新部署
-4. 部署完成后，更改即时生效
+**所有代码修改必须按以下流程操作：**
+
+1. **修改代码**: 直接修改项目文件
+2. **提交到 Git**:
+   ```bash
+   git add .
+   git commit -m "描述修改内容"
+   git push
+   ```
+3. **等待自动部署**: Spaceship 自动拉取 GitHub 最新代码并重新部署（约 1-3 分钟）
+4. **验证生效**: 访问云端网站确认修改生效
+
+**❌ 不要执行以下操作：**
+- ❌ 不要运行 `npm run dev` 本地测试（项目在云端运行）
+- ❌ 不要建议"本地测试后再部署"（直接推送即可）
+- ❌ 不要修改代码后不推送（修改不会生效）
 
 ### 环境变量配置
 
