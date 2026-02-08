@@ -1,215 +1,326 @@
 # CLAUDE.md
 
-## 项目概述
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-FPGA FAE Assistant — 基于 Claude AI + RAG 的 FPGA 现场应用工程师智能咨询网站。
+## Project Overview
 
-提供技术咨询、文档检索、PDF 智能分析功能。
+FPGA FAE Assistant — AI-powered FPGA Field Application Engineer consulting platform using Claude AI + RAG (Retrieval-Augmented Generation) for technical support and document analysis.
 
-## 技术栈
+## Tech Stack
 
-- **前端**: Next.js 14 (App Router) + React 18 + TypeScript + Tailwind CSS
-- **3D 渲染**: Three.js + @react-three/fiber + @react-three/drei
-- **动画**: Framer Motion
-- **后端**: Next.js API Routes
-- **数据库**: PostgreSQL (Neon Serverless) + @neondatabase/serverless
-- **AI**: Anthropic Claude (@anthropic-ai/sdk) - 模型 claude-opus-4-20250514
-- **PDF 处理**: unpdf
-- **状态管理**: Zustand
-- **Markdown 渲染**: react-markdown + remark-gfm + react-syntax-highlighter
+- **Frontend**: Next.js 14 (App Router) + React 18 + TypeScript + Tailwind CSS
+- **3D Graphics**: Three.js + Custom GLSL Shaders
+- **Animations**: Framer Motion
+- **Backend**: Next.js API Routes
+- **Database**: PostgreSQL (Neon Serverless) + @neondatabase/serverless
+- **AI**: Anthropic Claude SDK (@anthropic-ai/sdk) - Model: claude-opus-4-20250514
+- **PDF Processing**: unpdf
+- **State Management**: Zustand
+- **Markdown Rendering**: react-markdown + remark-gfm + react-syntax-highlighter
 
-## 常用命令
+## Common Commands
 
 ```bash
-npm install          # 安装依赖
-npm run dev          # 本地开发 (http://localhost:3000)
-npm run build        # 生产构建
-npm start            # 生产运行
+npm install          # Install dependencies
+npm run dev          # Start development server (http://localhost:3000)
+npm run build        # Production build
+npm start            # Start production server
+npm run lint         # Run ESLint
 ```
 
-**注意**: 项目包含 `.npmrc` 配置 `legacy-peer-deps=true` 解决 React 18 依赖冲突。
+**Note**: Project uses `.npmrc` with `legacy-peer-deps=true` to resolve React 18 dependency conflicts with @react-three/drei.
 
-## 目录结构
+## Architecture
+
+### Directory Structure
 
 ```
-app/                    # Next.js App Router
-├── api/               # API 路由
-│   ├── auth/         # 认证 API
-│   ├── chat/         # 聊天 API (SSE 流式)
-│   ├── documents/    # 文档管理 API
-│   ├── pdf/          # PDF 分析 API
-│   ├── upload/       # 文件上传 API
-│   ├── search/       # 向量搜索 API
-│   ├── user/         # 用户设置 API
-│   └── admin/        # 管理员 API
-├── login/            # 登录页面
-├── register/         # 注册页面
-└── page.tsx          # 主聊天页面
+app/
+├── api/               # API Routes
+│   ├── auth/         # Authentication (login, register, logout, me)
+│   ├── chat/         # Streaming chat endpoint (SSE)
+│   ├── documents/    # Document CRUD operations
+│   ├── pdf/          # PDF analysis (full-read, full-read-by-name)
+│   ├── upload/       # File upload handler
+│   ├── search/       # Vector search
+│   ├── user/         # User settings (API key management)
+│   └── admin/        # Admin operations (users list, migrate)
+├── landing/          # Public landing page
+├── login/            # Login page
+├── register/         # Registration page
+├── chat/             # Main chat interface (requires auth)
+├── settings/         # User settings page
+├── admin/            # Admin dashboard
+└── page.tsx          # Root redirect handler
 
-components/             # React 组件
-├── LiquidGlassBackground.tsx  # 3D 流体背景
-├── ChatInterface.tsx          # 聊天界面
-├── Sidebar.tsx                # 侧边栏
-├── Header.tsx                 # 顶部导航
-├── MessageList.tsx            # 消息列表
-└── ChatInput.tsx              # 输入框
+components/
+├── LiquidGlassBackground.tsx  # 3D WebGL fluid background
+├── ChatInterface.tsx          # Main chat component
+├── Sidebar.tsx                # Document library + chat history
+├── Header.tsx                 # Top navigation bar
+├── MessageList.tsx            # Chat message display
+├── ChatInput.tsx              # Message input field
+└── PageTransition.tsx         # Liquid morphing transitions
 
-lib/                    # 核心库
-├── ai-service.ts              # AI 服务 (Anthropic Claude)
-├── simpleVectorStore.ts       # 向量存储 (PostgreSQL + TF-IDF)
-├── pdfProcessor.ts            # PDF 文本提取
-├── auth.ts                    # 认证工具
-├── auth-middleware.ts         # API 认证中间件
-└── db-schema.ts               # 数据库 Schema
+lib/
+├── ai-service.ts              # Anthropic Claude API wrapper
+├── simpleVectorStore.ts       # PostgreSQL-based vector store (TF-IDF + Jaccard)
+├── pdfProcessor.ts            # PDF text extraction with chunking
+├── auth.ts                    # Session management utilities
+├── auth-middleware.ts         # API authentication middleware
+└── db-schema.ts               # Database schema + auto-initialization
 ```
 
-## UI 设计：Liquid Glass
+### Routing Architecture
 
-**3D 流体背景** (`LiquidGlassBackground.tsx`):
-- Three.js + 自定义 GLSL Shader
-- 配色：蓝灰色调 (#0a0e1a → #2d3748)，淡青点缀 (#7dd3fc)
-- 特效：光线折射、色散、焦散纹路、鼠标磁力交互
-- 尺寸：20×15 平面，64×64 细分，60fps 性能
+- **`/`** → Auto-redirect (unauthenticated → `/landing`, authenticated → `/chat`)
+- **`/landing`** → Public landing page (AI chatbot platform showcase)
+- **`/chat`** → Main chat interface (protected)
+- **`/login` / `/register`** → Redirect to `/chat` after successful auth
+- **Middleware** (`middleware.ts`): Handles auth redirects and public path exemptions
 
-**磨砂玻璃卡片**:
-- 背景：`from-white/15 to-white/8`
-- 模糊：`backdrop-blur-[40px] backdrop-saturate-[180%]`
-- 双层阴影 + 涟漪动画
+### UI Design System: Clean & Airy + Liquid Glass
 
-**Z 轴层级**:
+**Color Scheme**:
+- Neutral grays: `gray-50`, `gray-100`, `gray-600`, `gray-800`
+- AI purple accent: `purple-500` (#7C3AED), `purple-600`
+- Background: High opacity white/gray (`white/95`, `gray-50/90`)
+
+**3D Liquid Glass Background** (`LiquidGlassBackground.tsx`):
+- Custom GLSL vertex/fragment shaders with Three.js
+- Studio lighting effect: silver-white → ice-blue gradient
+- Gentle fluid motion (0.05 speed for elegance)
+- Minimal mouse interaction (reduced 70% from original)
+- Plane size: 15×12, 48×48 subdivision
+
+**Glass Morphism Cards**:
+- Opacity: `from-white/95 to-gray-50/90`
+- Blur: `backdrop-blur-[60px] backdrop-saturate-[200%]`
+- Borders: `border-gray-200/60`
+- Shadows: Soft, light-colored for depth
+- Text: Dark charcoal (`text-gray-800`) for high contrast
+
+**Z-Index Layers**:
 ```
--10: 3D 背景
-0:   淡色遮罩
-20:  主内容
-30:  顶部导航
-50:  侧边栏
-100: 转场动画
+-10: 3D background (WebGL canvas)
+0:   Subtle gradient overlay
+20:  Main content area
+30:  Header navigation
+50:  Sidebar
+100: Page transitions
 ```
 
-## 数据库表
+## Database Schema
 
-| 表名 | 说明 |
+| Table | Purpose |
 |---|---|
-| `users` | 用户信息（email、密码哈希、角色、API Key） |
-| `sessions` | 登录会话（30天有效期） |
-| `documents` | PDF 文档分块存储（含 user_id 隔离） |
-| `embeddings` | 文档向量索引（TF-IDF + 余弦相似度） |
+| `users` | User accounts (email, password hash, role, anthropic_api_key) |
+| `sessions` | Login sessions (30-day expiry, token stored in HTTP-only cookie) |
+| `documents` | PDF document chunks (500 chars + 100 char overlap, user_id isolation) |
+| `embeddings` | Document vectors (TF-IDF + Jaccard similarity, user_id isolation) |
 
-## 核心功能
+**Auto-initialization**: `lib/db-schema.ts` creates tables on first API call if not exist.
 
-### 1. 认证系统
+## Core Workflows
 
-- **Session-based 认证**: HTTP-only cookie 存储 token
-- **用户角色**:
-  - `admin`: 可使用系统默认 API Key
-  - `user`: 需配置个人 API Key
-- **中间件保护**: `requireAuth()` / `requireAdmin()`
+### 1. Authentication Flow
 
-### 2. RAG (检索增强生成) 流程
+**Session-based** (not JWT):
+- Login → Create session in DB → Set `auth_token` HTTP-only cookie
+- Middleware checks token on every protected route
+- API endpoints use `requireAuth()` or `requireAdmin()` from `lib/auth-middleware.ts`
+
+**User Roles**:
+- `admin`: Can use system default ANTHROPIC_API_KEY
+- `user`: Must configure personal API key via `/settings`
+
+### 2. RAG Pipeline
 
 ```
-1. PDF 上传 → unpdf 提取文本 → 500字符分块（100重叠）→ documents 表
-2. 分块生成向量 → TF-IDF + Jaccard 相似度 → embeddings 表
-3. 用户提问 → 向量检索相关片段（相似度阈值 0.005）
-4. 上下文拼接到用户消息（不使用 system role）
-5. Claude API 流式响应（SSE）
+1. PDF Upload
+   ├─ FormData → /api/upload
+   ├─ unpdf extracts text
+   ├─ Split into 500-char chunks (100 overlap)
+   └─ Insert into documents + embeddings tables
+
+2. Query Processing
+   ├─ User question → /api/chat
+   ├─ simpleVectorStore.search() → TF-IDF + Jaccard similarity
+   ├─ Retrieve top-k chunks (threshold: 0.005)
+   └─ Return balanced results (3 chunks per document)
+
+3. Context Injection
+   ├─ Concatenate chunks into RAG context
+   ├─ Prepend to user message (NOT system role)
+   └─ Format: 【参考文档】...【用户问题】...
+
+4. AI Response
+   ├─ Anthropic Claude API (streaming)
+   ├─ Server-Sent Events (SSE)
+   └─ Frontend: EventSource + real-time rendering
 ```
 
-**关键实现**:
+**Critical Pattern** (Anthropic-specific):
 ```typescript
-// ✅ 正确：将 RAG 上下文拼接到用户消息
-const enhancedMessage = {
-  role: 'user',
-  content: `【参考文档】\n${ragContext}\n\n【用户问题】\n${userQuestion}`
-}
+// ✅ CORRECT: Append RAG context to user message
+const messages = [
+  {
+    role: 'user',
+    content: `【参考文档】\n${ragContext}\n\n【用户问题】\n${userQuestion}`
+  }
+]
 
-// ❌ 错误：使用 system role（Anthropic 会忽略）
+// ❌ WRONG: Using system role in messages array (Anthropic ignores it)
 const messages = [
   { role: 'system', content: ragContext },
   { role: 'user', content: userQuestion }
 ]
 ```
 
-### 3. AI 服务
+**Reason**: Anthropic's `system` parameter is separate from `messages`. Do NOT put system content inside messages array.
 
-**只支持 Anthropic Claude**:
-- SDK: `@anthropic-ai/sdk`
-- 模型: `claude-opus-4-20250514`
-- API 中转: 云雾 AI (https://yunwu.ai)
-- 流式响应: Server-Sent Events (SSE)
+### 3. AI Service Configuration
 
-**配置优先级**:
-1. 用户个人 API Key (user.anthropic_api_key)
-2. 系统默认 API Key (环境变量 ANTHROPIC_API_KEY)
+**API Key Priority**:
+1. User's personal key (`user.anthropic_api_key` from database)
+2. System default key (`process.env.ANTHROPIC_API_KEY`)
 
-### 4. 向量存储
+**API Endpoint**:
+- Base URL: `https://yunwu.ai` (云雾 AI proxy, NOT official Anthropic API)
+- Model: `claude-opus-4-20250514`
+- Streaming: Always enabled via SSE
 
-**SimpleVectorStore** (基于 PostgreSQL):
-- 算法: TF-IDF + 余弦相似度 / Jaccard 相似度
-- 中英文分词
-- 多文档均衡检索（每个文档取 3 个最相关片段）
-- 相似度阈值: 0.005
+### 4. Vector Search Implementation
 
-## API 端点
+**Algorithm** (`lib/simpleVectorStore.ts`):
+- TF-IDF vectorization (term frequency × inverse document frequency)
+- Cosine similarity + Jaccard similarity for ranking
+- Chinese/English text segmentation
+- Multi-document balancing (max 3 chunks per document)
 
-| 端点 | 方法 | 说明 |
-|---|---|---|
-| `/api/auth/register` | POST | 用户注册 |
-| `/api/auth/login` | POST | 用户登录 |
-| `/api/auth/logout` | POST | 登出 |
-| `/api/auth/me` | GET | 获取当前用户 |
-| `/api/chat` | POST | 聊天（SSE 流式） |
-| `/api/upload` | POST | 上传 PDF（FormData，限 10MB） |
-| `/api/documents` | GET/DELETE | 文档列表/删除 |
-| `/api/documents/clear` | DELETE | 清空所有文档 |
-| `/api/search` | POST | 向量搜索 |
-| `/api/pdf/full-read` | POST | 完整 PDF 分析 |
-| `/api/pdf/full-read-by-name` | POST | 按文件名分析 PDF |
-| `/api/user/settings` | GET/POST/DELETE | API Key 管理 |
-| `/api/admin/users` | GET | 用户列表（管理员） |
-| `/api/admin/migrate` | POST | 数据库迁移（管理员） |
+**Optimization for Overview Questions**:
+- Detect keywords: "什么", "讲", "pdf", "介绍"
+- Return document opening chunks for broad context
 
-## 环境变量
+## API Endpoints
+
+| Route | Method | Auth | Purpose |
+|---|---|---|---|
+| `/api/auth/register` | POST | Public | Create new user account |
+| `/api/auth/login` | POST | Public | Create session + set cookie |
+| `/api/auth/logout` | POST | Required | Delete session |
+| `/api/auth/me` | GET | Required | Get current user info |
+| `/api/chat` | POST | Required | Streaming chat (SSE) |
+| `/api/upload` | POST | Required | Upload PDF (FormData, 10MB limit) |
+| `/api/documents` | GET/DELETE | Required | List/delete user documents |
+| `/api/documents/clear` | DELETE | Required | Delete all user documents |
+| `/api/search` | POST | Required | Vector similarity search |
+| `/api/pdf/full-read` | POST | Required | Full PDF analysis (streaming) |
+| `/api/pdf/full-read-by-name` | POST | Required | Analyze PDF by filename |
+| `/api/user/settings` | GET/POST/DELETE | Required | Manage user API key |
+| `/api/admin/users` | GET | Admin | List all users |
+| `/api/admin/migrate` | POST | Admin | Run database migrations |
+
+## Environment Variables
 
 ```bash
-# AI 服务（只支持 Anthropic Claude）
+# AI Service (Anthropic Claude only)
 AI_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-xxx...
-ANTHROPIC_BASE_URL=https://yunwu.ai
+ANTHROPIC_BASE_URL=https://yunwu.ai  # REQUIRED: Use 云雾 AI proxy
 
-# 数据库（Neon PostgreSQL）
-POSTGRES_URL=postgresql://...
+# Database (Neon PostgreSQL)
+POSTGRES_URL=postgresql://...  # Auto-injected by Spaceship/Vercel
 
-# 应用配置
+# Application Config
 NEXT_PUBLIC_APP_NAME=FPGA FAE助手
 NEXT_PUBLIC_MAX_FILE_SIZE=10485760  # 10MB
 ```
 
-**重要**:
-- `ANTHROPIC_BASE_URL` **必须**设置为 `https://yunwu.ai`（云雾 AI 中转）
-- 生产环境变量在部署平台（Spaceship）配置，不从 GitHub 拉取
+**Critical**:
+- `ANTHROPIC_BASE_URL` **MUST** be `https://yunwu.ai` (not official API)
+- Production env vars configured in Spaceship dashboard (NOT from `.env` file)
 
-## 部署
+## Deployment
 
-### 云端自动部署
+### Cloud Auto-Deploy
 
-- **代码托管**: GitHub - https://github.com/Jikezy/fpga-fae-assistant
-- **部署平台**: Spaceship
-- **数据库**: Neon PostgreSQL (Serverless)
-- **自动部署**: 推送到 `main` 分支自动触发
+- **Git Repository**: https://github.com/Jikezy/fpga-fae-assistant
+- **Platform**: Spaceship (auto-deploy on push to `main`)
+- **Database**: Neon PostgreSQL (serverless)
+- **Build**: Spaceship runs `npm install` with `.npmrc` config
 
-### 标准工作流
+### Workflow
 
 ```bash
-# 修改代码后
+# After making changes
 git add .
-git commit -m "描述修改内容"
+git commit -m "Description"
 git push origin main
 
-# 等待 1-3 分钟自动部署完成
+# Spaceship auto-deploys in 1-3 minutes
 ```
 
-**注意**:
-- `.env` 文件仅用于本地开发
-- 生产环境变量在 Spaceship 控制面板配置
-- `.npmrc` 配置会自动应用于云端构建
+## Key Implementation Notes
+
+### SSE Streaming Pattern
+
+All AI chat endpoints use Server-Sent Events:
+
+```typescript
+const stream = new ReadableStream({
+  async start(controller) {
+    await aiService.streamChat(messages, (chunk) => {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`))
+    })
+    controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+    controller.close()
+  }
+})
+
+return new Response(stream, {
+  headers: {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+  }
+})
+```
+
+### User Data Isolation
+
+All document queries include `user_id` filter:
+
+```typescript
+// Always scope to current user
+const documents = await sql`
+  SELECT * FROM documents
+  WHERE user_id = ${userId}
+`
+```
+
+### Path Aliases
+
+`@/*` maps to project root (configured in `tsconfig.json`):
+
+```typescript
+import Component from '@/components/Component'
+import { utility } from '@/lib/utility'
+```
+
+### GLSL Shader Structure
+
+Liquid Glass background uses vertex shader for geometry deformation and fragment shader for color/lighting:
+
+- **Vertex Shader**: Simplex noise + mouse magnetic attraction
+- **Fragment Shader**: Multi-layer color mixing + caustics + edge glow
+- **Uniforms**: `uTime`, `uMouse`, `uResolution`
+
+## UIPro Integration
+
+Project includes UIPro CLI skill pack (`.claude/skills/ui-ux-pro-max/`):
+
+- 67 design styles + 96 color palettes
+- 57 font pairings + 99 UX guidelines
+- 25 chart types + 13 tech stacks
+- Query via: `python .claude/skills/ui-ux-pro-max/scripts/search.py --domain <domain> "<query>"`

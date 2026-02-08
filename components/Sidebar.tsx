@@ -86,8 +86,8 @@ export default function Sidebar({ isOpen, onToggle, onFullRead }: SidebarProps) 
                 <DocumentUploader
                   onUploadSuccess={() => setRefreshKey(prev => prev + 1)}
                 />
-                <div className="border-t border-white/20 pt-4">
-                  <h3 className="text-sm font-medium text-white mb-3 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">已上传文档</h3>
+                <div className="border-t border-gray-200 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-800 mb-3">已上传文档</h3>
                   <DocumentList key={refreshKey} onFullRead={onFullRead} />
                 </div>
               </div>
@@ -95,8 +95,8 @@ export default function Sidebar({ isOpen, onToggle, onFullRead }: SidebarProps) 
           </div>
 
           {/* 底部信息 */}
-          <div className="p-4 border-t border-white/20 bg-white/5">
-            <div className="text-xs text-white/90 space-y-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+          <div className="p-4 border-t border-gray-200 bg-gray-50/80">
+            <div className="text-xs text-gray-700 space-y-1 font-medium">
               <p>💡 支持的文档格式：PDF</p>
               <p>🔒 数据本地存储，安全可靠</p>
             </div>

@@ -171,7 +171,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-white/30 border-t-white"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-blue-500"></div>
       </div>
     )
   }
@@ -180,7 +180,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
     return (
       <div className="text-center py-8">
         <svg
-          className="w-12 h-12 mx-auto text-white/30 mb-3"
+          className="w-12 h-12 mx-auto text-gray-400 mb-3"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -192,8 +192,8 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        <p className="text-sm text-white/60">暂无文档</p>
-        <p className="text-xs text-white/40 mt-1">上传PDF文档以开始使用</p>
+        <p className="text-sm text-gray-700 font-medium">暂无文档</p>
+        <p className="text-xs text-gray-600 mt-1">上传PDF文档以开始使用</p>
       </div>
     )
   }
@@ -202,27 +202,27 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
     <div className="space-y-4">
       {/* 排序栏 */}
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-gray-400">排序:</span>
+        <span className="text-gray-700 font-semibold">排序:</span>
         <button
           onClick={() => toggleSort('time')}
-          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 ${
-            sortBy === 'time' ? 'bg-gray-700/40 text-gray-100' : 'text-gray-400 hover:bg-gray-700/30'
+          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 font-medium ${
+            sortBy === 'time' ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'text-gray-700 hover:bg-gray-100 border border-gray-200'
           }`}
         >
           时间 {sortBy === 'time' && (sortOrder === 'desc' ? '↓' : '↑')}
         </button>
         <button
           onClick={() => toggleSort('name')}
-          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 ${
-            sortBy === 'name' ? 'bg-gray-700/40 text-gray-100' : 'text-gray-400 hover:bg-gray-700/30'
+          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 font-medium ${
+            sortBy === 'name' ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'text-gray-700 hover:bg-gray-100 border border-gray-200'
           }`}
         >
           名称 {sortBy === 'name' && (sortOrder === 'desc' ? '↓' : '↑')}
         </button>
         <button
           onClick={() => toggleSort('chunks')}
-          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 ${
-            sortBy === 'chunks' ? 'bg-gray-700/40 text-gray-100' : 'text-gray-400 hover:bg-gray-700/30'
+          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 font-medium ${
+            sortBy === 'chunks' ? 'bg-blue-100 text-blue-800 border border-blue-300' : 'text-gray-700 hover:bg-gray-100 border border-gray-200'
           }`}
         >
           片段数 {sortBy === 'chunks' && (sortOrder === 'desc' ? '↓' : '↑')}
@@ -231,14 +231,14 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
 
       {/* 操作栏 */}
       <div className="flex items-center justify-between text-xs">
-        <label className="flex items-center gap-2 cursor-pointer hover:text-gray-200 transition-colors active:scale-95">
+        <label className="flex items-center gap-2 cursor-pointer hover:text-gray-900 transition-colors active:scale-95">
           <input
             type="checkbox"
             checked={selectedDocs.size === documents.length && documents.length > 0}
             onChange={toggleSelectAll}
-            className="w-3.5 h-3.5 rounded border-gray-500/40"
+            className="w-3.5 h-3.5 rounded border-gray-400"
           />
-          <span className="text-gray-200">
+          <span className="text-gray-800 font-medium">
             全选 ({selectedDocs.size}/{documents.length})
           </span>
         </label>
@@ -248,7 +248,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
             <button
               onClick={deleteSelected}
               disabled={deleting}
-              className="px-2 py-1 text-xs bg-red-900/50 backdrop-blur-sm text-gray-100 rounded-lg hover:bg-red-900/70 active:scale-95 disabled:opacity-50 transition-all shadow-lg"
+              className="px-2 py-1 text-xs bg-red-600 backdrop-blur-sm text-white rounded-lg hover:bg-red-700 active:scale-95 disabled:opacity-50 transition-all shadow-lg font-medium"
             >
               删除 ({selectedDocs.size})
             </button>
@@ -256,7 +256,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
           <button
             onClick={clearAll}
             disabled={deleting}
-            className="px-2 py-1 text-xs bg-gray-700/30 backdrop-blur-sm text-gray-100 rounded-lg hover:bg-gray-700/50 active:scale-95 disabled:opacity-50 transition-all"
+            className="px-2 py-1 text-xs bg-gray-200 backdrop-blur-sm text-gray-800 rounded-lg hover:bg-gray-300 active:scale-95 disabled:opacity-50 transition-all font-medium border border-gray-300"
           >
             清空全部
           </button>
@@ -268,15 +268,15 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
         {sortedDocuments.map((doc) => (
           <div
             key={doc.filename}
-            className="border border-gray-600/30 rounded-2xl hover:border-gray-500/50 transition-all backdrop-blur-sm overflow-hidden"
+            className="border border-gray-300 rounded-2xl hover:border-blue-400 hover:shadow-lg transition-all backdrop-blur-sm overflow-hidden bg-white/80"
           >
             <div
               className={`
                 flex items-center gap-2 p-2.5 cursor-pointer transition-all
                 ${
                   selectedDocs.has(doc.filename)
-                    ? 'bg-gray-700/40'
-                    : 'hover:bg-gray-700/20'
+                    ? 'bg-blue-50/80'
+                    : 'hover:bg-gray-50/80'
                 }
               `}
               onClick={() => toggleDocument(doc.filename)}
@@ -288,7 +288,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
                 className="w-3.5 h-3.5 rounded border-gray-500/40 flex-shrink-0"
               />
               <svg
-                className="w-6 h-6 text-gray-400 flex-shrink-0"
+                className="w-6 h-6 text-red-600 flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -299,8 +299,8 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
                 />
               </svg>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-100 truncate">{doc.filename}</p>
-                <div className="flex items-center gap-2 text-xs text-gray-400">
+                <p className="text-sm font-semibold text-gray-800 truncate">{doc.filename}</p>
+                <div className="flex items-center gap-2 text-xs text-gray-700 font-medium">
                   <span>{doc.chunks} 个片段</span>
                   <span>•</span>
                   <span>{formatTime(doc.uploadedAt)}</span>
@@ -315,7 +315,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
                     e.stopPropagation()
                     onFullRead(doc.filename)
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-gray-700 to-gray-800 text-gray-100 text-xs rounded-xl hover:from-gray-600 hover:to-gray-700 active:scale-95 transition-all font-medium shadow-lg ring-1 ring-gray-500/50"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-xs rounded-xl hover:from-blue-600 hover:to-blue-700 active:scale-95 transition-all font-semibold shadow-lg ring-1 ring-blue-400/50"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
