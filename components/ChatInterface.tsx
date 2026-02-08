@@ -121,7 +121,10 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       })
 
       if (!response.ok) {
-        throw new Error('API请求失败')
+        // 尝试读取错误详情
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.message || errorData?.error || 'API请求失败'
+        throw new Error(errorMessage)
       }
 
       const reader = response.body?.getReader()
@@ -197,12 +200,15 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
         console.log('用户已停止生成')
         return
       }
+
+      // 显示具体的错误信息
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: '抱歉，完整阅读失败。请检查网络连接或稍后重试。',
+          content: `抱歉，完整阅读失败。\n\n错误详情：${errorMessage}\n\n💡 提示：如果提示缺少API配置，请前往设置页面配置您的云雾AI API Key。`,
           timestamp: new Date(),
         },
       ])
@@ -250,7 +256,10 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       })
 
       if (!response.ok) {
-        throw new Error('API请求失败')
+        // 尝试读取错误详情
+        const errorData = await response.json().catch(() => null)
+        const errorMessage = errorData?.message || errorData?.error || 'API请求失败'
+        throw new Error(errorMessage)
       }
 
       const reader = response.body?.getReader()
@@ -307,12 +316,15 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
         console.log('用户已停止生成')
         return
       }
+
+      // 显示具体的错误信息
+      const errorMessage = error instanceof Error ? error.message : '未知错误'
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: '抱歉，发生了错误。请检查API配置或稍后重试。',
+          content: `抱歉，发生了错误。\n\n错误详情：${errorMessage}\n\n💡 提示：如果提示缺少API配置，请前往设置页面配置您的云雾AI API Key。`,
           timestamp: new Date(),
         },
       ])
