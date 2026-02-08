@@ -52,11 +52,11 @@ export async function POST(req: NextRequest) {
     }
 
     apiKey = user.anthropic_api_key
-    baseURL = user.anthropic_base_url || 'https://api.anthropic.com'
+    baseURL = user.anthropic_base_url || 'https://yunwu.ai'
 
     if (user.role === 'admin' && !apiKey) {
       apiKey = process.env.ANTHROPIC_API_KEY
-      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'
+      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
     }
 
     // 创建 AI 服务实例
