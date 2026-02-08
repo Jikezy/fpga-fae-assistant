@@ -35,35 +35,28 @@ export async function POST(req: NextRequest) {
 
     const user = userConfig[0] as any
 
-    // 根据 provider 决定 API Key 和 Base URL
+    // 只支持 Anthropic provider
     let apiKey: string | undefined
     let baseURL: string | undefined
 
-    if (provider === 'anthropic') {
-      // Anthropic/云雾AI：优先使用用户配置，管理员可使用系统默认
-      if (user.role !== 'admin' && !user.anthropic_api_key) {
-        return new Response(
-          JSON.stringify({
-            error: 'API配置缺失',
-            message: '请先配置您的云雾AI API Key',
-            needsConfig: true,
-          }),
-          { status: 403, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
+    // 优先使用用户配置，管理员可使用系统默认
+    if (user.role !== 'admin' && !user.anthropic_api_key) {
+      return new Response(
+        JSON.stringify({
+          error: 'API配置缺失',
+          message: '请先配置您的 Anthropic API Key',
+          needsConfig: true,
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
-      apiKey = user.anthropic_api_key
-      baseURL = user.anthropic_base_url || 'https://yunwu.ai'
+    apiKey = user.anthropic_api_key
+    baseURL = user.anthropic_base_url || 'https://api.anthropic.com'
 
-      if (user.role === 'admin' && !apiKey) {
-        apiKey = process.env.ANTHROPIC_API_KEY
-        baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
-      }
-    } else {
-      // 其他 provider（智谱、通义千问等）：使用环境变量配置
-      // 不传递 apiKey 和 baseURL，让 AIService 从环境变量获取
-      apiKey = undefined
-      baseURL = undefined
+    if (user.role === 'admin' && !apiKey) {
+      apiKey = process.env.ANTHROPIC_API_KEY
+      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com'
     }
 
     // 创建 AI 服务实例
@@ -81,7 +74,7 @@ export async function POST(req: NextRequest) {
         JSON.stringify({
           error: 'AI服务不可用',
           message: health.message,
-          suggestion: '请检查配置或安装 Ollama 本地模型'
+          suggestion: '请检查 Anthropic API Key 配置是否正确'
         }),
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       )
@@ -228,7 +221,7 @@ ${fileList}
         } catch (error) {
           console.error('AI服务错误:', error)
           const errorData = JSON.stringify({
-            content: `抱歉，AI服务出现错误：${error instanceof Error ? error.message : '未知错误'}。\n\n请检查：\n1. 如果使用 Anthropic，确保 API Key 正确\n2. 如果使用 Ollama，确保服务已启动（ollama serve）\n3. 检查网络连接`,
+            content: `抱歉，AI服务出现错误：${error instanceof Error ? error.message : '未知错误'}。\n\n请检查：\n1. 确保 Anthropic API Key 正确\n2. 检查网络连接\n3. 确认 API 配额是否充足`,
           })
           controller.enqueue(encoder.encode(`data: ${errorData}\n\n`))
           controller.close()

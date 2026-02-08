@@ -5,7 +5,7 @@ import { useState } from 'react'
 export interface ModelOption {
   id: string
   name: string
-  provider: 'ollama' | 'zhipu' | 'qwen' | 'ernie' | 'spark' | 'anthropic'
+  provider: 'anthropic'
   description: string
   isFree: boolean
 }
@@ -17,13 +17,6 @@ const AVAILABLE_MODELS: ModelOption[] = [
     provider: 'anthropic',
     description: '最新最强模型，顶级智能和性能',
     isFree: false,
-  },
-  {
-    id: 'zhipu-glm-4-flash',
-    name: '智谱 GLM-4-Flash',
-    provider: 'zhipu',
-    description: '快速响应，每月1000万tokens免费',
-    isFree: true,
   },
 ]
 

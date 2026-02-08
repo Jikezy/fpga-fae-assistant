@@ -21,7 +21,6 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
   // 获取模型友好名称
   const getModelDisplayName = (modelId: string) => {
     if (modelId === 'anthropic-claude-opus-4-6') return 'Claude Opus 4.6'
-    if (modelId === 'zhipu-glm-4-flash') return '智谱 GLM-4-Flash'
     return modelId
   }
 
@@ -209,7 +208,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
 
     try {
       // 解析模型 ID 获取 provider 和 model
-      // 格式: provider-modelName (例如: zhipu-glm-4-flash)
+      // 格式: provider-modelName (例如: anthropic-claude-opus-4-6)
       const [provider, ...modelParts] = currentModel.split('-')
       const modelName = modelParts.join('-')
 
