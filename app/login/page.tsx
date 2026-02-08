@@ -28,7 +28,7 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (response.ok) {
-        router.push('/')
+        router.push('/chat')
         router.refresh()
       } else {
         setError(data.error || '登录失败')
@@ -46,7 +46,7 @@ export default function LoginPage() {
       <LiquidGlassBackground />
 
       {/* Subtle gradient overlay for better contrast */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/20 via-transparent to-slate-900/20 z-0" />
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-100/20 via-transparent to-gray-100/20 z-0" />
 
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
@@ -54,7 +54,7 @@ export default function LoginPage() {
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md relative z-10"
       >
-        <div className="bg-gradient-to-br from-white/20 to-white/10 backdrop-blur-[40px] backdrop-saturate-[180%] rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)] p-8 border border-white/30">
+        <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] p-8 border border-gray-200/60">
           {/* Logo */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -62,13 +62,13 @@ export default function LoginPage() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="text-center mb-8"
           >
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-cyan-400/20 to-slate-600/20 backdrop-blur-sm rounded-full mb-4 shadow-xl ring-2 ring-white/40 border border-white/30">
-              <svg className="w-10 h-10 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full mb-4 shadow-xl ring-2 ring-blue-200 border border-blue-300">
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]">FPGA FAE助手</h1>
-            <p className="text-white/95 mt-2 text-sm drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">登录您的账号</p>
+            <h1 className="text-3xl font-bold text-gray-800">FPGA FAE助手</h1>
+            <p className="text-gray-600 mt-2 text-sm">登录您的账号</p>
           </motion.div>
 
           {/* Error Message */}
@@ -76,9 +76,9 @@ export default function LoginPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="mb-4 p-3.5 bg-red-500/15 backdrop-blur-sm border border-red-400/30 rounded-2xl"
+              className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-2xl"
             >
-              <p className="text-sm text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{error}</p>
+              <p className="text-sm text-red-600">{error}</p>
             </motion.div>
           )}
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
             >
-              <label htmlFor="email" className="block text-sm font-medium text-white mb-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-800 mb-2">
                 邮箱地址
               </label>
               <input
@@ -98,7 +98,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 bg-white/15 backdrop-blur-sm border border-white/30 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/50 outline-none transition-all text-white placeholder-white/50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                className="w-full px-4 py-3.5 bg-white/80 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all text-gray-800 placeholder-gray-500"
                 placeholder="your@email.com"
               />
             </motion.div>
@@ -108,7 +108,7 @@ export default function LoginPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4, duration: 0.5 }}
             >
-              <label htmlFor="password" className="block text-sm font-medium text-white mb-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-800 mb-2">
                 密码
               </label>
               <input
@@ -117,7 +117,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 bg-white/15 backdrop-blur-sm border border-white/30 rounded-2xl focus:ring-2 focus:ring-cyan-400/50 focus:border-cyan-400/50 outline-none transition-all text-white placeholder-white/50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                className="w-full px-4 py-3.5 bg-white/80 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all text-gray-800 placeholder-gray-500"
                 placeholder="••••••••"
               />
             </motion.div>
@@ -130,7 +130,7 @@ export default function LoginPage() {
               disabled={loading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full bg-gradient-to-r from-cyan-400 to-cyan-600 text-white py-3.5 px-4 rounded-2xl hover:shadow-[0_8px_30px_rgba(34,211,238,0.4)] active:scale-95 focus:ring-4 focus:ring-cyan-300/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-xl"
+              className="w-full bg-gradient-to-r from-blue-400 to-blue-600 text-white py-3.5 px-4 rounded-2xl hover:shadow-[0_8px_30px_rgba(59,130,246,0.4)] active:scale-95 focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-xl"
             >
               {loading ? '登录中...' : '登录'}
             </motion.button>
@@ -143,9 +143,9 @@ export default function LoginPage() {
             transition={{ delay: 0.6, duration: 0.5 }}
             className="mt-6 text-center"
           >
-            <p className="text-sm text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+            <p className="text-sm text-gray-700">
               还没有账号？{' '}
-              <Link href="/register" className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors underline decoration-transparent hover:decoration-cyan-400">
+              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium transition-colors underline decoration-transparent hover:decoration-blue-600">
                 立即注册
               </Link>
             </p>
@@ -159,7 +159,7 @@ export default function LoginPage() {
           transition={{ delay: 0.7, duration: 0.5 }}
           className="text-center mt-8"
         >
-          <p className="text-sm text-white/80 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+          <p className="text-sm text-gray-600">
             © 2026 FPGA FAE助手. All rights reserved.
           </p>
         </motion.div>

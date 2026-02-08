@@ -92,17 +92,17 @@ export default function LiquidGlassBackground() {
         vUv = uv;
         vPosition = position;
 
-        // Liquid deformation
+        // 缓慢优雅的液态变形（克制的动画）
         vec3 pos = position;
-        float noise = snoise(vec3(position.x * 0.5 + uTime * 0.1, position.y * 0.5, uTime * 0.2));
+        float noise = snoise(vec3(position.x * 0.3 + uTime * 0.05, position.y * 0.3, uTime * 0.1));
 
-        // Mouse interaction - magnetic attraction
-        vec2 mouseInfluence = (uMouse - position.xy) * 0.3;
+        // 轻柔的鼠标磁力（水滴般丝滑）
+        vec2 mouseInfluence = (uMouse - position.xy) * 0.15;
         float dist = length(mouseInfluence);
-        float influence = smoothstep(2.0, 0.0, dist);
+        float influence = smoothstep(1.5, 0.0, dist);
 
-        pos.z += noise * 0.5 + influence * 0.8;
-        pos.xy += mouseInfluence * influence * 0.3;
+        pos.z += noise * 0.3 + influence * 0.4;
+        pos.xy += mouseInfluence * influence * 0.15;
 
         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
       }
@@ -115,12 +115,12 @@ export default function LiquidGlassBackground() {
       uniform vec2 uMouse;
       uniform vec2 uResolution;
 
-      // Color palette - Minimalist blue-gray scheme
-      vec3 color1 = vec3(0.039, 0.055, 0.102); // Deep blue-black #0a0e1a
-      vec3 color2 = vec3(0.102, 0.125, 0.173); // Dark blue-gray #1a202c
-      vec3 color3 = vec3(0.176, 0.216, 0.282); // Medium blue-gray #2d3748
-      vec3 color4 = vec3(0.490, 0.827, 0.988); // Light cyan accent #7dd3fc
-      vec3 color5 = vec3(0.541, 0.608, 0.729); // Muted blue-gray #8a9bb7
+      // Clean & Airy - 影棚柔光配色（清澈水晶感）
+      vec3 color1 = vec3(0.95, 0.96, 0.98); // 乳白色 #f2f4f9
+      vec3 color2 = vec3(0.88, 0.91, 0.95); // 银白色 #e1e8f2
+      vec3 color3 = vec3(0.82, 0.87, 0.93); // 高级灰 #d1dded
+      vec3 color4 = vec3(0.70, 0.85, 0.95); // 淡雅冰蓝 #b3d9f2
+      vec3 color5 = vec3(0.60, 0.75, 0.88); // 水晶蓝 #99bfe0
 
       // Simplex noise for smooth gradients
       float hash(vec2 p) {
@@ -170,44 +170,37 @@ export default function LiquidGlassBackground() {
         distortedUv.x += sin(uv.y * 10.0 + uTime * 0.3) * 0.02;
         distortedUv.y += cos(uv.x * 10.0 + uTime * 0.2) * 0.02;
 
-        // Multi-layer color mixing
-        float n1 = noise(distortedUv * 2.0 + uTime * 0.1);
-        float n2 = noise(distortedUv * 3.0 - uTime * 0.15);
-        float n3 = noise(distortedUv * 1.5 + vec2(uTime * 0.08));
+        // 克制的多层混合（少而精）
+        float n1 = noise(distortedUv * 1.5 + uTime * 0.05); // 减速，更优雅
+        float n2 = noise(distortedUv * 2.0 - uTime * 0.08);
 
-        // Color blending based on position and noise
-        vec3 color = mix(color1, color2, n1);
-        color = mix(color, color3, n2 * 0.7);
-        color = mix(color, color4, n3 * 0.3);
+        // 清澈的颜色混合（高亮度）
+        vec3 color = mix(color1, color2, n1 * 0.5);
+        color = mix(color, color3, n2 * 0.3);
 
-        // Add caustics highlight
+        // 水晶焦散（轻微点缀）
         float causticsPattern = caustic(distortedUv, uTime);
-        color += color5 * causticsPattern * 0.15;
+        color += color4 * causticsPattern * 0.15;
 
-        // Chromatic aberration
-        vec3 aberration = chromaticAberration(distortedUv, 1.0);
-        color *= 0.9 + aberration * 0.1;
+        // 柔和的边缘光晕（影棚柔光效果）
+        float edgeGlow = smoothstep(0.0, 0.5, length(uv - center)) * 0.2;
+        color = mix(color, vec3(0.92, 0.94, 0.97), edgeGlow);
 
-        // Volumetric fog (depth attenuation)
-        float depth = length(vPosition) * 0.3;
-        color *= 1.0 - depth * 0.2;
-
-        // Add subtle glow around edges
-        float edgeGlow = smoothstep(0.0, 0.3, length(uv - center)) * 0.2;
-        color += vec3(0.9, 0.95, 1.0) * edgeGlow;
-
-        // Mouse proximity glow
-        vec2 mouseUv = (uMouse + 1.0) * 0.5; // Convert from -1,1 to 0,1
+        // 极微弱的鼠标交互（不干扰视觉）
+        vec2 mouseUv = (uMouse + 1.0) * 0.5;
         float mouseDist = length(uv - mouseUv);
-        float mouseGlow = smoothstep(0.4, 0.0, mouseDist) * 0.3;
-        color += color4 * mouseGlow;
+        float mouseGlow = smoothstep(0.25, 0.0, mouseDist) * 0.08;
+        color += color5 * mouseGlow;
+
+        // 保持高亮度（影棚光感）
+        color = clamp(color, 0.85, 1.0);
 
         gl_FragColor = vec4(color, 1.0);
       }
     `
 
-    // Create liquid mesh
-    const geometry = new THREE.PlaneGeometry(20, 15, 64, 64) // 增大尺寸以覆盖整个屏幕
+    // 克制的液态网格（少而精，留白处浮动）
+    const geometry = new THREE.PlaneGeometry(15, 12, 48, 48) // 减少尺寸和细分，更优雅
     const material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
@@ -256,8 +249,8 @@ export default function LiquidGlassBackground() {
       material.uniforms.uTime.value = clock.getElapsedTime()
       material.uniforms.uMouse.value.set(mousePos.current.x, mousePos.current.y)
 
-      // Gentle rotation
-      mesh.rotation.z = Math.sin(clock.getElapsedTime() * 0.1) * 0.1
+      // 轻盈的旋转（水滴般优雅）
+      mesh.rotation.z = Math.sin(clock.getElapsedTime() * 0.05) * 0.05
 
       renderer.render(scene, camera)
     }

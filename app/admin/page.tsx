@@ -30,7 +30,7 @@ export default function AdminPage() {
         const data = await response.json()
         setCurrentUser(data.user)
         if (data.user.role !== 'admin') {
-          router.push('/')
+          router.push('/chat')
         }
       } else {
         router.push('/login')

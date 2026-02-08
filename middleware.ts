@@ -6,15 +6,23 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value
 
   // 公开路径（不需要登录）
-  const publicPaths = ['/login', '/register', '/api/auth/login', '/api/auth/register']
+  const publicPaths = ['/login', '/register', '/landing', '/api/auth/login', '/api/auth/register']
 
   // 如果是公开路径，直接放行
   if (publicPaths.some(path => pathname.startsWith(path))) {
-    // 如果已登录用户访问登录页，重定向到首页
+    // 如果已登录用户访问登录/注册页，重定向到聊天页面
     if (token && (pathname === '/login' || pathname === '/register')) {
-      return NextResponse.redirect(new URL('/', request.url))
+      return NextResponse.redirect(new URL('/chat', request.url))
     }
     return NextResponse.next()
+  }
+
+  // 主页特殊处理：未登录显示着陆页，已登录跳转到聊天
+  if (pathname === '/') {
+    if (token) {
+      return NextResponse.redirect(new URL('/chat', request.url))
+    }
+    return NextResponse.redirect(new URL('/landing', request.url))
   }
 
   // 其他路径需要登录
