@@ -123,19 +123,22 @@ export class SimpleVectorStore {
       console.log(`[搜索] 共有 ${docsBySource.size} 个不同的文档文件`)
 
       // 如果是泛泛的询问（比如"有几个文档"、"pdf讲的什么"），从每个文档都取一些片段
-      const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about', '几个', '多少', '有哪些', '上传', '文档']
+      const generalQuestions = ['什么', 'what', '内容', 'content', '讲', '关于', 'about', '几个', '多少', '有哪些', '上传', '文档', 'pdf', '介绍', '说明', '概述']
       const matchedKeywords = generalQuestions.filter(keyword =>
         query.toLowerCase().includes(keyword)
       )
-      // 如果匹配了2个或以上关键词，或者问题中包含"几个"/"多少"，就认为是概览性问题
-      const isGeneralQuestion = matchedKeywords.length >= 2 ||
+      // 降低阈值：匹配1个或以上关键词，或者问题中包含特定词汇，就认为是概览性问题
+      const isGeneralQuestion = matchedKeywords.length >= 1 ||
                                 query.includes('几个') ||
                                 query.includes('多少') ||
-                                query.includes('有哪些')
+                                query.includes('有哪些') ||
+                                query.includes('讲什么') ||
+                                query.includes('讲的什么') ||
+                                query.includes('帮我看看')
 
       if (isGeneralQuestion) {
-        console.log('[搜索] 检测到概览性询问，从每个文档取片段')
-        const perDocLimit = Math.max(2, Math.floor(topK / docsBySource.size))
+        console.log('[搜索] 检测到概览性询问（匹配关键词:', matchedKeywords.join(', '), '），从每个文档取片段')
+        const perDocLimit = Math.max(3, Math.floor(topK / docsBySource.size))
         const results: Document[] = []
 
         docsBySource.forEach((docs, source) => {

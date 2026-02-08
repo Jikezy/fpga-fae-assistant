@@ -67,6 +67,36 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                         </code>
                       )
                     },
+                    table({ children }: any) {
+                      return (
+                        <div className="overflow-x-auto my-4">
+                          <table className="min-w-full border border-gray-300 rounded-lg">
+                            {children}
+                          </table>
+                        </div>
+                      )
+                    },
+                    thead({ children }: any) {
+                      return (
+                        <thead className="bg-gray-100">
+                          {children}
+                        </thead>
+                      )
+                    },
+                    th({ children }: any) {
+                      return (
+                        <th className="px-4 py-2 text-left text-sm font-semibold text-gray-900 border-b-2 border-gray-300">
+                          {children}
+                        </th>
+                      )
+                    },
+                    td({ children }: any) {
+                      return (
+                        <td className="px-4 py-2 text-sm text-gray-800 border-b border-gray-200">
+                          {children}
+                        </td>
+                      )
+                    },
                   }}
                 >
                   {message.content}

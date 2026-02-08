@@ -177,7 +177,32 @@ ${context}
 
             console.log('已将检索到的文档添加到上下文中')
           } else {
-            console.log('未找到相关文档，将使用通用回答')
+            // 未检索到相关内容，但告诉AI用户有哪些文档
+            console.log('未找到相关文档，但会告诉AI用户有哪些文档可用')
+            const fileList = allDocs.map(d => {
+              const fileName = d.source.split(/[/\\]/).pop() || d.source
+              return `- ${fileName} (${d.chunks}个片段)`
+            }).join('\n')
+
+            const systemPrompt = `你是一个专业的技术文档助手。用户上传了${allDocs.length}个PDF文档：
+
+${fileList}
+
+但针对当前问题："${lastMessage.content}"，我没有找到特别相关的内容片段。
+
+请告诉用户：
+1. 你已经上传了这些文档
+2. 当前问题可能需要更具体的关键词，或者可以使用"完整阅读"功能来深入分析整个文档
+3. 如果用户想了解文档内容，建议使用侧边栏的"完整阅读"按钮`
+
+            enhancedMessages = [
+              ...messages.slice(0, -1),
+              {
+                role: 'system',
+                content: systemPrompt
+              },
+              lastMessage
+            ]
           }
         }
       } catch (error) {
