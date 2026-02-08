@@ -4,7 +4,7 @@ import { Message } from './ChatInterface'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 interface MessageListProps {
   messages: Message[]
@@ -48,14 +48,21 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                       const isInline = !match
                       return !isInline ? (
                         <SyntaxHighlighter
-                          style={vscDarkPlus as any}
+                          style={oneLight as any}
                           language={match[1]}
                           PreTag="div"
+                          customStyle={{
+                            background: '#fafafa',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '0.5rem',
+                            padding: '1rem',
+                            fontSize: '0.875rem',
+                          }}
                         >
                           {String(children).replace(/\n$/, '')}
                         </SyntaxHighlighter>
                       ) : (
-                        <code className={className}>
+                        <code className="bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded text-sm">
                           {children}
                         </code>
                       )

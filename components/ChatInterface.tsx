@@ -18,17 +18,36 @@ interface ChatInterfaceProps {
 }
 
 export default function ChatInterface({ currentModel, fullReadRequest, onFullReadComplete }: ChatInterfaceProps) {
+  // 获取模型友好名称
+  const getModelDisplayName = (modelId: string) => {
+    if (modelId === 'anthropic-claude-opus-4-6') return 'Claude Opus 4.6'
+    if (modelId === 'zhipu-glm-4-flash') return '智谱 GLM-4-Flash'
+    return modelId
+  }
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: '你好！我是FPGA FAE助手。我可以帮助你：\n\n- 📚 查询FPGA数据手册和技术文档\n- 💡 解答FPGA设计和应用问题\n- 🔧 提供技术方案和最佳实践建议\n- 🐛 协助调试和问题排查\n\n请随时向我提问！',
+      content: `你好！我是FPGA FAE助手，可以帮你查询文档、解答技术问题。\n\n📌 当前模型：**${getModelDisplayName(currentModel)}**`,
       timestamp: new Date(),
     },
   ])
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  // 当模型切换时更新欢迎消息
+  useEffect(() => {
+    setMessages([
+      {
+        id: '1',
+        role: 'assistant',
+        content: `你好！我是FPGA FAE助手，可以帮你查询文档、解答技术问题。\n\n📌 当前模型：**${getModelDisplayName(currentModel)}**`,
+        timestamp: new Date(),
+      },
+    ])
+  }, [currentModel])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
