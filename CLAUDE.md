@@ -60,6 +60,7 @@ components/
 ├── Header.tsx                 # Top navigation bar
 ├── MessageList.tsx            # Chat message display
 ├── ChatInput.tsx              # Message input field
+├── DocumentList.tsx           # PDF document list with sorting
 └── PageTransition.tsx         # Liquid morphing transitions
 
 lib/
@@ -82,13 +83,27 @@ lib/
 ### UI Design System: Clean & Airy + Liquid Glass
 
 **Color Scheme**:
-- Neutral grays: `gray-50`, `gray-100`, `gray-600`, `gray-800`
-- AI purple accent: `purple-500` (#7C3AED), `purple-600`
-- Background: High opacity white/gray (`white/95`, `gray-50/90`)
+- **Primary Text**: `gray-800` (dark charcoal for high contrast)
+- **Secondary Text**: `gray-600`, `gray-700` (metadata, labels)
+- **Subtle Text**: `gray-500` (placeholders)
+- **Backgrounds**: `white/95`, `gray-50/90` (high opacity glass cards)
+- **Borders**: `gray-200/60`, `gray-300` (subtle separation)
+- **AI Purple Accent**: `purple-500` (#7C3AED), `purple-600` (landing page CTA)
+- **Blue Accent**: `blue-400` to `blue-600` (buttons, icons, AI avatar)
+- **PDF Red**: `red-600` (PDF document icons for visibility)
+
+**Contrast Guidelines** (Critical for Readability):
+- All body text: `text-gray-800` + `font-medium` or `font-semibold`
+- Timestamps: `text-gray-600` + `font-medium` (NOT white/transparent)
+- PDF icons: `text-red-600` (high contrast, recognizable)
+- Document metadata: `text-gray-700` + `font-medium`
+- Button text: White on dark backgrounds, `gray-800` on light backgrounds
+- Active states: `bg-blue-100 text-blue-800` for selected items
 
 **3D Liquid Glass Background** (`LiquidGlassBackground.tsx`):
 - Custom GLSL vertex/fragment shaders with Three.js
 - Studio lighting effect: silver-white → ice-blue gradient
+- Color palette: `vec3(0.95, 0.96, 0.98)` to `vec3(0.82, 0.87, 0.93)`
 - Gentle fluid motion (0.05 speed for elegance)
 - Minimal mouse interaction (reduced 70% from original)
 - Plane size: 15×12, 48×48 subdivision
@@ -97,7 +112,7 @@ lib/
 - Opacity: `from-white/95 to-gray-50/90`
 - Blur: `backdrop-blur-[60px] backdrop-saturate-[200%]`
 - Borders: `border-gray-200/60`
-- Shadows: Soft, light-colored for depth
+- Shadows: `shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)]`
 - Text: Dark charcoal (`text-gray-800`) for high contrast
 
 **Z-Index Layers**:
@@ -177,7 +192,7 @@ const messages = [
 ]
 ```
 
-**Reason**: Anthropic's `system` parameter is separate from `messages`. Do NOT put system content inside messages array.
+**Reason**: Anthropic's `system` parameter is separate from `messages`. Do NOT put system content inside messages array. The system prompt is passed separately to the API via the `system` parameter in `lib/ai-service.ts`.
 
 ### 3. AI Service Configuration
 
@@ -315,6 +330,24 @@ Liquid Glass background uses vertex shader for geometry deformation and fragment
 - **Vertex Shader**: Simplex noise + mouse magnetic attraction
 - **Fragment Shader**: Multi-layer color mixing + caustics + edge glow
 - **Uniforms**: `uTime`, `uMouse`, `uResolution`
+
+### Code Highlighting
+
+Use `oneLight` theme for syntax highlighting (light theme for consistency):
+
+```typescript
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+
+<SyntaxHighlighter
+  style={oneLight as any}
+  customStyle={{
+    background: 'rgba(248, 250, 252, 0.95)',
+    backdropFilter: 'blur(20px)',
+    border: '1px solid rgba(226, 232, 240, 0.8)',
+    borderRadius: '1rem',
+  }}
+>
+```
 
 ## UIPro Integration
 
