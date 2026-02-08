@@ -37,7 +37,7 @@ export class AIService {
       provider,
       apiKey: config?.apiKey || process.env.ANTHROPIC_API_KEY,
       baseURL: config?.baseURL || process.env.ANTHROPIC_BASE_URL || '',
-      model: config?.model || process.env.ANTHROPIC_MODEL || 'claude-opus-4-6-20250514',
+      model: config?.model || process.env.ANTHROPIC_MODEL || 'claude-opus-4-20250514',
     }
 
     // 初始化 Anthropic 客户端
