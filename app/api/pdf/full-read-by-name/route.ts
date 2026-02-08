@@ -25,9 +25,43 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 从数据库获取该文件的所有文档片段（仅当前用户的）
+    // 获取用户的API配置
     const { getSql } = await import('@/lib/db-schema')
     const sql = getSql()
+    const userConfig = await sql`
+      SELECT anthropic_api_key, anthropic_base_url, role
+      FROM users
+      WHERE id = ${authResult.user.id}
+    `
+
+    if (userConfig.length === 0) {
+      return NextResponse.json(
+        { error: '用户不存在' },
+        { status: 404 }
+      )
+    }
+
+    const user = userConfig[0] as any
+
+    // 如果是普通用户且未配置API Key，返回错误
+    if (user.role !== 'admin' && !user.anthropic_api_key) {
+      return NextResponse.json({
+        error: 'API配置缺失',
+        message: '请先在设置中配置您的云雾AI API Key',
+        needsConfig: true,
+      }, { status: 403 })
+    }
+
+    // 决定使用哪个API Key和Base URL
+    let apiKey = user.anthropic_api_key
+    let baseURL = user.anthropic_base_url || 'https://yunwu.ai'
+
+    if (user.role === 'admin' && !apiKey) {
+      apiKey = process.env.ANTHROPIC_API_KEY
+      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
+    }
+
+    // 从数据库获取该文件的所有文档片段（仅当前用户的）
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
 
@@ -52,21 +86,20 @@ export async function POST(req: NextRequest) {
 
     const totalPages = Math.max(...documents.map((doc: any) => doc.page || 0))
 
-    // 估算费用（智谱 GLM-4-Plus 定价）
+    // 估算费用（Claude Opus 4.6 定价）
     const estimatedInputTokens = fullContent.length / 4 // 粗略估算：4字符=1token
     const estimatedOutputTokens = 1500
-    const inputCost = (estimatedInputTokens / 1000000) * 50 // ¥50/百万tokens
-    const outputCost = (estimatedOutputTokens / 1000000) * 50 // ¥50/百万tokens
+    const inputCost = (estimatedInputTokens / 1000000) * 18 // ¥18/百万tokens
+    const outputCost = (estimatedOutputTokens / 1000000) * 90 // ¥90/百万tokens
     const totalCost = inputCost + outputCost
 
-    // 调用AI服务（使用最好的智谱模型进行完整阅读）
+    // 调用AI服务（使用最好的 Claude Opus 4.6 进行完整阅读）
     const { AIService } = await import('@/lib/ai-service')
-    const provider = 'zhipu' as const
-    const model = 'glm-4-plus' // 使用最好的智谱模型
-
     const aiService = new AIService({
-      provider,
-      model,
+      provider: 'anthropic',
+      model: 'claude-opus-4-6',
+      apiKey,
+      baseURL,
     })
 
     const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'
