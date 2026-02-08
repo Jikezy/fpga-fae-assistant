@@ -18,8 +18,8 @@ export default function Home() {
         {/* 3D Liquid Glass Background */}
         <LiquidGlassBackground />
 
-        {/* Dark overlay for contrast */}
-        <div className="absolute inset-0 bg-black/30 z-0" />
+        {/* Subtle gradient overlay for better contrast */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900/15 via-transparent to-slate-900/15 z-0" />
 
         {/* 侧边栏 */}
         <Sidebar

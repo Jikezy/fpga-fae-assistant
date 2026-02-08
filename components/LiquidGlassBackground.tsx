@@ -207,7 +207,7 @@ export default function LiquidGlassBackground() {
     `
 
     // Create liquid mesh
-    const geometry = new THREE.PlaneGeometry(10, 10, 64, 64)
+    const geometry = new THREE.PlaneGeometry(20, 15, 64, 64) // 增大尺寸以覆盖整个屏幕
     const material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
