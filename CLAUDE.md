@@ -67,12 +67,32 @@ Session-based 认证：
 | `documents` | PDF 文档分块存储，含 `user_id` 隔离 |
 | `embeddings` | 文档向量索引，含 `user_id` 隔离 |
 
-### RAG 流程
+### RAG 流程（关键实现细节）
 
-1. 用户上传 PDF → `pdfProcessor` 提取文本并分块 → 存入 `documents` 表
-2. 分块文本生成向量 → 存入 `embeddings` 表
-3. 用户提问 → `simpleVectorStore` 检索相关文档片段 → 拼接为上下文注入 AI prompt
-4. AI 通过 SSE 流式返回响应
+1. **PDF 上传**: 用户上传 PDF → `pdfProcessor` 提取文本并分块 → 存入 `documents` 表
+2. **向量索引**: 分块文本生成向量 → 存入 `embeddings` 表
+3. **检索增强**: 用户提问 → `simpleVectorStore` 检索相关文档片段
+4. **上下文注入**: **将检索到的内容直接拼接到用户消息中**（不使用 system role）
+   - 格式：`【参考文档】...【用户问题】...【回答要求】...`
+   - 原因：Anthropic 的 `system` 参数独立，忽略 messages 中的 system role；其他 provider 不支持多个 system 消息
+5. **流式响应**: AI 通过 SSE 流式返回响应
+
+**关键代码模式**:
+```typescript
+// ❌ 错误：使用 system role（会被 Anthropic 忽略）
+enhancedMessages = [
+  { role: 'system', content: ragContext },
+  { role: 'user', content: userQuestion }
+]
+
+// ✅ 正确：拼接到用户消息
+enhancedMessages = [
+  {
+    role: 'user',
+    content: `【参考文档】${ragContext}\n【用户问题】${userQuestion}`
+  }
+]
+```
 
 ### 用户文档隔离
 
@@ -90,7 +110,7 @@ Session-based 认证：
 | `/api/upload` | POST | 上传 PDF（FormData，限 10MB） |
 | `/api/documents` | GET/DELETE | 文档列表/删除 |
 | `/api/search` | POST | 向量搜索 |
-| `/api/pdf/full-read` | POST | 完整 PDF 分析（SSE） |
+| `/api/pdf/full-read-by-name` | POST | 完整 PDF 分析（SSE，使用 Claude Opus 4.6） |
 | `/api/user/settings` | GET/POST/DELETE | 用户 API Key 管理 |
 | `/api/admin/users` | GET | 管理员用户列表 |
 | `/api/admin/migrate` | POST | 数据库迁移 |
@@ -99,15 +119,59 @@ Session-based 认证：
 
 关键环境变量见 `.env.example`：
 - `AI_PROVIDER` — AI 供应商选择（anthropic/ollama/openai/zhipu/qwen/ernie/spark）
-- `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` — Anthropic 配置（支持 API 中转）
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` — Anthropic 配置（支持 API 中转，如云雾AI）
+- `ZHIPU_API_KEY` / `ZHIPU_MODEL` — 智谱AI 配置（默认 glm-4-flash）
 - `POSTGRES_URL` — 数据库连接（Vercel 自动注入）
 - `NEXT_PUBLIC_APP_NAME` — 应用名称
 - `NEXT_PUBLIC_MAX_FILE_SIZE` — 上传文件大小限制
 
 ## Key Patterns
 
-- 路径别名：`@/*` 映射到项目根目录
-- AI 聊天响应使用 Server-Sent Events (SSE) 流式传输
-- 密码使用 SHA-256 哈希（生产环境应升级为 bcrypt）
-- 数据库 schema 通过 `initializeDatabase()` 自动创建，无需手动迁移
-- `next.config.js` 中 webpack externals 排除了 chromadb 和 onnxruntime-node
+### AI Provider 路由逻辑
+
+- **Anthropic provider**: 使用用户配置的 API Key（优先），管理员可使用系统默认
+- **其他 provider**: 使用环境变量配置，不传递用户 API Key
+- 前端通过 `currentModel` (如 `anthropic-claude-opus-4-6`, `zhipu-glm-4-flash`) 解析出 provider 和 model
+
+### 文档检索优化
+
+- **概览性问题检测**: 匹配关键词（什么、讲、pdf、介绍等），返回文档开头片段
+- **相似度阈值**: 0.005（较低，提高召回率）
+- **多文档均衡**: 从每个文档取 3 个最相关片段
+- **Fallback 机制**: 未检索到内容时，告诉 AI 用户有哪些文档可用
+
+### UI 组件样式
+
+- 代码块使用 `oneLight` 浅色主题（`react-syntax-highlighter`）
+- 表格样式：灰色表头（`bg-gray-100`）+ 清晰边框，避免黑色背景
+- Markdown 渲染：`react-markdown` + `remark-gfm`
+
+### Webpack 配置
+
+- `next.config.js` 排除 `chromadb` 和 `onnxruntime-node`（服务端外部依赖）
+- 禁用 `fs`, `net`, `tls`, `path` fallback（边缘运行时兼容）
+
+### 流式响应（SSE）
+
+所有 AI 聊天使用 Server-Sent Events：
+```typescript
+const stream = new ReadableStream({
+  async start(controller) {
+    await aiService.streamChat(messages, (chunk) => {
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: chunk })}\n\n`))
+    })
+    controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+    controller.close()
+  }
+})
+```
+
+### 路径别名
+
+`@/*` 映射到项目根目录（`tsconfig.json` 配置）
+
+### 数据库初始化
+
+- `initializeDatabase()` 自动创建表结构（`CREATE TABLE IF NOT EXISTS`）
+- 支持增量 schema 更新（`ALTER TABLE IF NOT EXISTS`）
+- 无需手动迁移脚本
