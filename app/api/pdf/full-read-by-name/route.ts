@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     // 调用AI服务（使用环境变量配置的提供商）
     const { AIService } = await import('@/lib/ai-service')
-    const provider = process.env.AI_PROVIDER || 'zhipu'
+    const provider = (process.env.AI_PROVIDER || 'zhipu') as 'anthropic' | 'ollama' | 'openai' | 'zhipu' | 'qwen' | 'ernie' | 'spark'
     const model = process.env.ZHIPU_MODEL || process.env.ANTHROPIC_MODEL || 'glm-4-flash'
 
     const aiService = new AIService({
