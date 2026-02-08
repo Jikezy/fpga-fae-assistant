@@ -34,7 +34,9 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
   ])
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const shouldAutoScrollRef = useRef(true)
 
   // 当模型切换时更新欢迎消息
   useEffect(() => {
@@ -48,12 +50,30 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
     ])
   }, [currentModel])
 
+  // 检查是否接近底部
+  const checkIfNearBottom = () => {
+    const container = messagesContainerRef.current
+    if (!container) return true
+
+    const threshold = 150 // 距离底部150px内视为接近底部
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    return distanceFromBottom < threshold
+  }
+
+  // 处理用户手动滚动
+  const handleScroll = () => {
+    shouldAutoScrollRef.current = checkIfNearBottom()
+  }
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  // 智能自动滚动：只有在用户位于底部时才滚动
   useEffect(() => {
-    scrollToBottom()
+    if (shouldAutoScrollRef.current) {
+      scrollToBottom()
+    }
   }, [messages])
 
   // 处理完整阅读请求
@@ -305,7 +325,11 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
   return (
     <div className="flex flex-col h-full bg-white">
       {/* 消息列表 */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto"
+        onScroll={handleScroll}
+      >
         <MessageList messages={messages} isLoading={isLoading} />
         <div ref={messagesEndRef} />
       </div>
