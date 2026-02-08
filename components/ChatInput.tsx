@@ -53,7 +53,7 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
         {isGenerating ? (
           <button
             onClick={onStop}
-            className="p-2.5 bg-gradient-to-br from-red-400 to-pink-600 text-white rounded-2xl hover:shadow-xl active:scale-95 transition-all flex-shrink-0 shadow-lg ring-1 ring-white/30"
+            className="p-2.5 bg-gradient-to-br from-red-400 to-red-600 text-white rounded-2xl hover:shadow-xl active:scale-95 transition-all flex-shrink-0 shadow-lg ring-1 ring-white/30"
             aria-label="停止生成"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -64,7 +64,7 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
           <button
             onClick={handleSubmit}
             disabled={disabled || !input.trim()}
-            className="p-2.5 bg-gradient-to-br from-cyan-400 to-purple-600 text-white rounded-2xl hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0 shadow-lg ring-1 ring-white/30"
+            className="p-2.5 bg-gradient-to-br from-cyan-400 to-cyan-600 text-white rounded-2xl hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0 shadow-lg ring-1 ring-white/30"
             aria-label="发送消息"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

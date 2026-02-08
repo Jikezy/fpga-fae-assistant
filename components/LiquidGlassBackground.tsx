@@ -115,12 +115,12 @@ export default function LiquidGlassBackground() {
       uniform vec2 uMouse;
       uniform vec2 uResolution;
 
-      // Color palette
-      vec3 color1 = vec3(0.102, 0.122, 0.227); // Deep indigo #1a1f3a
-      vec3 color2 = vec3(0.388, 0.400, 0.945); // Violet #6366f1
-      vec3 color3 = vec3(0.925, 0.282, 0.600); // Magenta #ec4899
-      vec3 color4 = vec3(0.133, 0.827, 0.933); // Cyan #22d3ee
-      vec3 color5 = vec3(0.984, 0.749, 0.141); // Gold #fbbf24
+      // Color palette - Minimalist blue-gray scheme
+      vec3 color1 = vec3(0.039, 0.055, 0.102); // Deep blue-black #0a0e1a
+      vec3 color2 = vec3(0.102, 0.125, 0.173); // Dark blue-gray #1a202c
+      vec3 color3 = vec3(0.176, 0.216, 0.282); // Medium blue-gray #2d3748
+      vec3 color4 = vec3(0.490, 0.827, 0.988); // Light cyan accent #7dd3fc
+      vec3 color5 = vec3(0.541, 0.608, 0.729); // Muted blue-gray #8a9bb7
 
       // Simplex noise for smooth gradients
       float hash(vec2 p) {

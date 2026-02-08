@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import LiquidGlassBackground from '@/components/LiquidGlassBackground'
+import { motion } from 'framer-motion'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -47,35 +49,46 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* 水墨背景效果 */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(100,116,139,0.2),transparent_50%)]"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(71,85,105,0.2),transparent_50%)]"></div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* 3D Liquid Glass Background */}
+      <LiquidGlassBackground />
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="bg-gray-900/40 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 border border-gray-600/30">
+      {/* Dark overlay for contrast */}
+      <div className="absolute inset-0 bg-black/30 z-0" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="w-full max-w-md relative z-10"
+      >
+        <div className="bg-gradient-to-br from-white/15 to-white/8 backdrop-blur-[40px] backdrop-saturate-[180%] rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.4)] p-8 border border-white/25">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-gray-600 to-gray-800 rounded-full mb-4 shadow-xl ring-2 ring-gray-500/50">
-              <svg className="w-8 h-8 text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-slate-500 to-slate-700 rounded-full mb-4 shadow-xl ring-2 ring-white/50">
+              <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-bold text-gray-100 drop-shadow-lg">FPGA FAE助手</h1>
-            <p className="text-gray-300 mt-2">创建您的账号</p>
+            <h1 className="text-3xl font-bold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">FPGA FAE助手</h1>
+            <p className="text-white/90 mt-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">创建您的账号</p>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 bg-red-900/30 backdrop-blur-sm border border-red-700/40 rounded-2xl">
-              <p className="text-sm text-gray-100">{error}</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-4 p-3 bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-2xl"
+            >
+              <p className="text-sm text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{error}</p>
+            </motion.div>
           )}
 
           {/* Register Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-100 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-white mb-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
                 邮箱地址
               </label>
               <input
@@ -84,13 +97,13 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition text-gray-100 placeholder-gray-400"
+                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/30 rounded-2xl focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition text-white placeholder-white/50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
                 placeholder="your@email.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-100 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-white mb-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
                 密码
               </label>
               <input
@@ -100,13 +113,13 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition text-gray-100 placeholder-gray-400"
+                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/30 rounded-2xl focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition text-white placeholder-white/50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
                 placeholder="至少6个字符"
               />
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-100 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-white mb-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
                 确认密码
               </label>
               <input
@@ -115,7 +128,7 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none transition text-gray-100 placeholder-gray-400"
+                className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/30 rounded-2xl focus:ring-2 focus:ring-cyan-400 focus:border-transparent outline-none transition text-white placeholder-white/50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
                 placeholder="再次输入密码"
               />
             </div>
@@ -123,7 +136,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-gray-700 to-gray-900 text-gray-100 py-3 px-4 rounded-2xl hover:shadow-2xl active:scale-95 focus:ring-4 focus:ring-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-xl ring-1 ring-gray-500/50"
+              className="w-full bg-gradient-to-r from-cyan-400 to-cyan-600 text-white py-3 px-4 rounded-2xl hover:shadow-2xl active:scale-95 focus:ring-4 focus:ring-cyan-300/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-xl"
             >
               {loading ? '注册中...' : '注册'}
             </button>
@@ -131,9 +144,9 @@ export default function RegisterPage() {
 
           {/* Login Link */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-200">
+            <p className="text-sm text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
               已有账号？{' '}
-              <Link href="/login" className="text-gray-300 hover:text-gray-100 font-medium transition-colors">
+              <Link href="/login" className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
                 立即登录
               </Link>
             </p>
@@ -142,11 +155,11 @@ export default function RegisterPage() {
 
         {/* Footer */}
         <div className="text-center mt-6">
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-white/70 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
             © 2026 FPGA FAE助手. All rights reserved.
           </p>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }

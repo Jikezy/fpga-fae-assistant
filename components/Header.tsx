@@ -74,14 +74,14 @@ export default function Header({ onMenuClick, currentModel, onModelChange }: Hea
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-white/20 transition-all backdrop-blur-sm active:scale-95"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-purple-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white/50">
+              <div className="w-8 h-8 bg-gradient-to-br from-slate-500 to-slate-700 rounded-full flex items-center justify-center shadow-lg ring-2 ring-white/50">
                 <span className="text-white text-sm font-medium drop-shadow-lg">
                   {user.email[0].toUpperCase()}
                 </span>
               </div>
               <span className="text-sm text-white font-medium hidden md:block drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{user.email}</span>
               {user.role === 'admin' && (
-                <span className="px-2 py-0.5 bg-gradient-to-r from-cyan-400/30 to-purple-600/30 backdrop-blur-sm text-white text-xs rounded-full font-semibold shadow ring-1 ring-white/30">
+                <span className="px-2 py-0.5 bg-gradient-to-r from-cyan-400/30 to-slate-600/30 backdrop-blur-sm text-white text-xs rounded-full font-semibold shadow ring-1 ring-white/30">
                   管理员
                 </span>
               )}
