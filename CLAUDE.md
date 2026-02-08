@@ -11,7 +11,7 @@ FPGA FAE Assistant — 基于 AI 的 FPGA 现场应用工程师智能咨询网�
 - **Frontend:** Next.js 14 (App Router) + React 18 + Tailwind CSS 3.4 + TypeScript
 - **Backend:** Next.js API Routes (Node.js runtime)
 - **Database:** PostgreSQL (Neon serverless), client: `@neondatabase/serverless`
-- **AI:** 多供应商支持 — Anthropic Claude, Ollama, OpenAI, 智谱AI, 通义千问, 文心一言, 讯飞星火
+- **AI:** Anthropic Claude Opus 4 独家（通过云雾 AI 中转 https://yunwu.ai）
 - **PDF处理:** unpdf
 - **状态管理:** Zustand
 
@@ -44,7 +44,7 @@ docker-compose down
 
 ### 核心模块
 
-- **`lib/ai-service.ts`** — AI 服务抽象层，统一接口支持 7 种 AI 供应商，支持流式响应
+- **`lib/ai-service.ts`** — AI 服务层，专为 Anthropic Claude 优化，支持流式响应
 - **`lib/simpleVectorStore.ts`** — 基于 PostgreSQL 的向量存储，使用 TF-IDF + Jaccard 相似度实现文档检索，支持中英文分词和多文档均衡检索
 - **`lib/pdfProcessor.ts`** — PDF 文本提取，500字符分块 + 100字符重叠
 - **`lib/auth.ts` + `lib/auth-middleware.ts`** — 认证工具和 API 中间件
@@ -117,21 +117,43 @@ enhancedMessages = [
 
 ## Environment Variables
 
-关键环境变量见 `.env.example`：
-- `AI_PROVIDER` — AI 供应商选择（anthropic/ollama/openai/zhipu/qwen/ernie/spark）
-- `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` — Anthropic 配置（支持 API 中转，如云雾AI）
-- `ZHIPU_API_KEY` / `ZHIPU_MODEL` — 智谱AI 配置（默认 glm-4-flash）
-- `POSTGRES_URL` — 数据库连接（Vercel 自动注入）
-- `NEXT_PUBLIC_APP_NAME` — 应用名称
-- `NEXT_PUBLIC_MAX_FILE_SIZE` — 上传文件大小限制
+**⚠️ 重要配置说明**：本项目现在只支持 Anthropic Claude，已移除智谱AI等其他 AI 供应商。
+
+### 必需环境变量
+
+```bash
+# AI 服务配置（只支持 Anthropic）
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-Rxd98BFLfbhXuvLeCvuRoXiqePiBjP9nr2BpoHeo2NejIn2p
+ANTHROPIC_BASE_URL=https://yunwu.ai  # 使用云雾 AI 中转站
+
+# 数据库配置
+POSTGRES_URL=postgresql://...  # Vercel/Spaceship 自动注入
+
+# 应用配置
+NEXT_PUBLIC_APP_NAME=FPGA FAE助手
+NEXT_PUBLIC_MAX_FILE_SIZE=10485760  # 10MB
+```
+
+### 关键配置说明
+
+- **`AI_PROVIDER`**: 固定为 `anthropic`
+- **`ANTHROPIC_API_KEY`**: 云雾 AI 的 API Key（格式：sk-xxx）
+- **`ANTHROPIC_BASE_URL`**: **必须设置为 `https://yunwu.ai`**（云雾 AI 中转，不是官方 API）
+- **`ANTHROPIC_MODEL`**: 可选，默认使用 `claude-opus-4-20250514`
+- **`POSTGRES_URL`**: 数据库连接（云端部署时自动注入）
 
 ## Key Patterns
 
-### AI Provider 路由逻辑
+### AI Provider 配置（仅 Anthropic）
 
-- **Anthropic provider**: 使用用户配置的 API Key（优先），管理员可使用系统默认
-- **其他 provider**: 使用环境变量配置，不传递用户 API Key
-- 前端通过 `currentModel` (如 `anthropic-claude-opus-4-6`, `zhipu-glm-4-flash`) 解析出 provider 和 model
+- **API Key 来源**: 优先使用用户个人配置的 API Key，管理员可使用系统默认配置
+- **API 中转**: 使用云雾 AI (https://yunwu.ai) 中转站，降低成本和延迟
+- **模型 ID**: `claude-opus-4-20250514`（Opus 4）
+- **前端模型标识**: `anthropic-claude-opus-4-6`（用于 UI 显示）
+- **用户角色**:
+  - `admin`: 可使用系统默认 API Key
+  - `user`: 必须配置个人 API Key（通过用户设置页面）
 
 ### 文档检索优化
 
@@ -175,3 +197,40 @@ const stream = new ReadableStream({
 - `initializeDatabase()` 自动创建表结构（`CREATE TABLE IF NOT EXISTS`）
 - 支持增量 schema 更新（`ALTER TABLE IF NOT EXISTS`）
 - 无需手动迁移脚本
+
+## Deployment
+
+### 部署架构
+
+- **代码托管**: GitHub (https://github.com/Jikezy/fpga-fae-assistant)
+- **自动部署**: 代码推送到 main 分支后自动触发部署
+- **数据库**: PostgreSQL (Neon Serverless)
+- **部署平台**: Spaceship 或 Vercel
+
+### 部署流程
+
+1. 本地开发并测试
+2. Git 提交代码: `git add . && git commit -m "message" && git push`
+3. 云端平台自动拉取 GitHub 最新代码并重新部署
+4. 部署完成后，更改即时生效
+
+### 环境变量配置
+
+云端环境变量必须在部署平台的控制面板中配置（不从 GitHub 拉取 .env 文件）：
+
+```bash
+# 必须在云端平台配置的环境变量
+AI_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-Rxd98BFLfbhXuvLeCvuRoXiqePiBjP9nr2BpoHeo2NejIn2p
+ANTHROPIC_BASE_URL=https://yunwu.ai
+POSTGRES_URL=<自动注入或手动配置>
+NEXT_PUBLIC_APP_NAME=FPGA FAE助手
+NEXT_PUBLIC_MAX_FILE_SIZE=10485760
+```
+
+### 重要提醒
+
+- ⚠️ `.env` 文件只用于本地开发，**不会**被推送到 GitHub
+- ⚠️ 云端环境变量需在部署平台控制面板单独配置
+- ⚠️ 修改环境变量后，需要手动触发重新部署（或等待下次代码推送）
+- ⚠️ `ANTHROPIC_BASE_URL` 必须设置为 `https://yunwu.ai`，否则 API 调用会失败
