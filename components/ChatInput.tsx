@@ -5,9 +5,11 @@ import { useState, useRef, KeyboardEvent } from 'react'
 interface ChatInputProps {
   onSend: (message: string) => void
   disabled?: boolean
+  isGenerating?: boolean
+  onStop?: () => void
 }
 
-export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+export default function ChatInput({ onSend, disabled, isGenerating, onStop }: ChatInputProps) {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -48,16 +50,28 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           rows={1}
           className="flex-1 bg-transparent resize-none outline-none text-gray-800 placeholder-gray-400 max-h-[200px]"
         />
-        <button
-          onClick={handleSubmit}
-          disabled={disabled || !input.trim()}
-          className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-          aria-label="发送消息"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-          </svg>
-        </button>
+        {isGenerating ? (
+          <button
+            onClick={onStop}
+            className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors flex-shrink-0"
+            aria-label="停止生成"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <rect x="6" y="6" width="12" height="12" />
+            </svg>
+          </button>
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={disabled || !input.trim()}
+            className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            aria-label="发送消息"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+          </button>
+        )}
       </div>
       <p className="text-xs text-gray-500 mt-2 text-center">
         AI可能会出错，请核实重要信息

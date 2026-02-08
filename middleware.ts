@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value
 
   // 公开路径（不需要登录）
-  const publicPaths = ['/login', '/register', '/api/auth/login', '/api/auth/register', '/api/fix-database']
+  const publicPaths = ['/login', '/register', '/api/auth/login', '/api/auth/register']
 
   // 如果是公开路径，直接放行
   if (publicPaths.some(path => pathname.startsWith(path))) {

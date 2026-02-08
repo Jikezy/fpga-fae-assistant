@@ -28,6 +28,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
   ])
   const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -45,6 +46,15 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
     }
   }, [fullReadRequest])
 
+  // 停止生成
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setIsLoading(false)
+    }
+  }
+
   const handleFullRead = async (filename: string) => {
     // 添加用户消息
     const userMessage: Message = {
@@ -56,6 +66,9 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
     setMessages((prev) => [...prev, userMessage])
     setIsLoading(true)
 
+    // 创建新的 AbortController
+    abortControllerRef.current = new AbortController()
+
     try {
       const response = await fetch('/api/pdf/full-read-by-name', {
         method: 'POST',
@@ -66,6 +79,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
           filename,
           question: '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。',
         }),
+        signal: abortControllerRef.current.signal,
       })
 
       if (!response.ok) {
@@ -140,6 +154,11 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       }
     } catch (error) {
       console.error('完整阅读失败:', error)
+      // 如果是用户主动中止，不显示错误消息
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('用户已停止生成')
+        return
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -151,6 +170,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       ])
     } finally {
       setIsLoading(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -164,6 +184,9 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
     }
     setMessages((prev) => [...prev, userMessage])
     setIsLoading(true)
+
+    // 创建新的 AbortController
+    abortControllerRef.current = new AbortController()
 
     try {
       // 解析模型 ID 获取 provider 和 model
@@ -185,6 +208,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
           provider,
           model: modelName,
         }),
+        signal: abortControllerRef.current.signal,
       })
 
       if (!response.ok) {
@@ -240,6 +264,11 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       }
     } catch (error) {
       console.error('发送消息失败:', error)
+      // 如果是用户主动中止，不显示错误消息
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('用户已停止生成')
+        return
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -251,6 +280,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       ])
     } finally {
       setIsLoading(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -264,7 +294,12 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
 
       {/* 输入框 */}
       <div className="border-t border-gray-200">
-        <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+        <ChatInput
+          onSend={handleSendMessage}
+          disabled={isLoading}
+          isGenerating={isLoading}
+          onStop={handleStop}
+        />
       </div>
     </div>
   )

@@ -93,13 +93,16 @@ export async function POST(req: NextRequest) {
     const outputCost = (estimatedOutputTokens / 1000000) * 90
     const totalCost = inputCost + outputCost
 
-    // 调用Claude API
+    // 调用AI服务（使用环境变量配置的提供商）
     const { AIService } = await import('@/lib/ai-service')
+    const provider = process.env.AI_PROVIDER || 'zhipu'
+    const model = process.env.ZHIPU_MODEL || process.env.ANTHROPIC_MODEL || 'glm-4-flash'
+
     const aiService = new AIService({
-      provider: 'anthropic',
-      model: 'claude-opus-4-6',
-      apiKey,
-      baseURL,
+      provider,
+      model,
+      apiKey: provider === 'anthropic' ? apiKey : undefined,
+      baseURL: provider === 'anthropic' ? baseURL : undefined,
     })
 
     const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'
