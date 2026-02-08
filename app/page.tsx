@@ -11,11 +11,11 @@ export default function Home() {
   const [fullReadRequest, setFullReadRequest] = useState<string | null>(null)
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 relative overflow-hidden">
-      {/* 动态背景效果 */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(120,119,198,0.3),transparent_50%)]"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(237,100,166,0.3),transparent_50%)]"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_20%,rgba(139,92,246,0.3),transparent_40%)]"></div>
+    <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden">
+      {/* 水墨背景效果 */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(100,116,139,0.2),transparent_50%)] z-0"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(71,85,105,0.2),transparent_50%)] z-0"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_40%_20%,rgba(148,163,184,0.15),transparent_40%)] z-0"></div>
 
       {/* 侧边栏 */}
       <Sidebar
@@ -25,7 +25,7 @@ export default function Home() {
       />
 
       {/* 主内容区 */}
-      <div className="flex-1 flex flex-col overflow-hidden relative z-10">
+      <div className="flex-1 flex flex-col overflow-hidden relative z-20">
         {/* 顶部导航 */}
         <Header
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}

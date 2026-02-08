@@ -202,27 +202,27 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
     <div className="space-y-4">
       {/* 排序栏 */}
       <div className="flex items-center gap-2 text-xs">
-        <span className="text-white/60">排序:</span>
+        <span className="text-gray-400">排序:</span>
         <button
           onClick={() => toggleSort('time')}
-          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm ${
-            sortBy === 'time' ? 'bg-cyan-400/30 text-white' : 'text-white/60 hover:bg-white/10'
+          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 ${
+            sortBy === 'time' ? 'bg-gray-700/40 text-gray-100' : 'text-gray-400 hover:bg-gray-700/30'
           }`}
         >
           时间 {sortBy === 'time' && (sortOrder === 'desc' ? '↓' : '↑')}
         </button>
         <button
           onClick={() => toggleSort('name')}
-          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm ${
-            sortBy === 'name' ? 'bg-cyan-400/30 text-white' : 'text-white/60 hover:bg-white/10'
+          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 ${
+            sortBy === 'name' ? 'bg-gray-700/40 text-gray-100' : 'text-gray-400 hover:bg-gray-700/30'
           }`}
         >
           名称 {sortBy === 'name' && (sortOrder === 'desc' ? '↓' : '↑')}
         </button>
         <button
           onClick={() => toggleSort('chunks')}
-          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm ${
-            sortBy === 'chunks' ? 'bg-cyan-400/30 text-white' : 'text-white/60 hover:bg-white/10'
+          className={`px-2 py-1 rounded-lg transition-all backdrop-blur-sm active:scale-95 ${
+            sortBy === 'chunks' ? 'bg-gray-700/40 text-gray-100' : 'text-gray-400 hover:bg-gray-700/30'
           }`}
         >
           片段数 {sortBy === 'chunks' && (sortOrder === 'desc' ? '↓' : '↑')}
@@ -231,14 +231,14 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
 
       {/* 操作栏 */}
       <div className="flex items-center justify-between text-xs">
-        <label className="flex items-center gap-2 cursor-pointer hover:text-cyan-300 transition-colors">
+        <label className="flex items-center gap-2 cursor-pointer hover:text-gray-200 transition-colors active:scale-95">
           <input
             type="checkbox"
             checked={selectedDocs.size === documents.length && documents.length > 0}
             onChange={toggleSelectAll}
-            className="w-3.5 h-3.5 rounded border-white/30"
+            className="w-3.5 h-3.5 rounded border-gray-500/40"
           />
-          <span className="text-white/80">
+          <span className="text-gray-200">
             全选 ({selectedDocs.size}/{documents.length})
           </span>
         </label>
@@ -248,7 +248,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
             <button
               onClick={deleteSelected}
               disabled={deleting}
-              className="px-2 py-1 text-xs bg-red-500/80 backdrop-blur-sm text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-all shadow-lg"
+              className="px-2 py-1 text-xs bg-red-900/50 backdrop-blur-sm text-gray-100 rounded-lg hover:bg-red-900/70 active:scale-95 disabled:opacity-50 transition-all shadow-lg"
             >
               删除 ({selectedDocs.size})
             </button>
@@ -256,7 +256,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
           <button
             onClick={clearAll}
             disabled={deleting}
-            className="px-2 py-1 text-xs bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 disabled:opacity-50 transition-all"
+            className="px-2 py-1 text-xs bg-gray-700/30 backdrop-blur-sm text-gray-100 rounded-lg hover:bg-gray-700/50 active:scale-95 disabled:opacity-50 transition-all"
           >
             清空全部
           </button>
@@ -268,15 +268,15 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
         {sortedDocuments.map((doc) => (
           <div
             key={doc.filename}
-            className="border border-white/20 rounded-2xl hover:border-cyan-400/50 transition-all backdrop-blur-sm overflow-hidden"
+            className="border border-gray-600/30 rounded-2xl hover:border-gray-500/50 transition-all backdrop-blur-sm overflow-hidden"
           >
             <div
               className={`
-                flex items-center gap-2 p-2.5 cursor-pointer
+                flex items-center gap-2 p-2.5 cursor-pointer transition-all
                 ${
                   selectedDocs.has(doc.filename)
-                    ? 'bg-cyan-400/20'
-                    : 'hover:bg-white/10'
+                    ? 'bg-gray-700/40'
+                    : 'hover:bg-gray-700/20'
                 }
               `}
               onClick={() => toggleDocument(doc.filename)}
@@ -285,10 +285,10 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
                 type="checkbox"
                 checked={selectedDocs.has(doc.filename)}
                 onChange={() => {}}
-                className="w-3.5 h-3.5 rounded border-white/30 flex-shrink-0"
+                className="w-3.5 h-3.5 rounded border-gray-500/40 flex-shrink-0"
               />
               <svg
-                className="w-6 h-6 text-pink-400 flex-shrink-0"
+                className="w-6 h-6 text-gray-400 flex-shrink-0"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -299,8 +299,8 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
                 />
               </svg>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{doc.filename}</p>
-                <div className="flex items-center gap-2 text-xs text-white/60">
+                <p className="text-sm font-medium text-gray-100 truncate">{doc.filename}</p>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
                   <span>{doc.chunks} 个片段</span>
                   <span>•</span>
                   <span>{formatTime(doc.uploadedAt)}</span>
@@ -315,7 +315,7 @@ export default function DocumentList({ onFullRead }: DocumentListProps = {}) {
                     e.stopPropagation()
                     onFullRead(doc.filename)
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all font-medium shadow-lg"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-gray-700 to-gray-800 text-gray-100 text-xs rounded-xl hover:from-gray-600 hover:to-gray-700 active:scale-95 transition-all font-medium shadow-lg ring-1 ring-gray-500/50"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
