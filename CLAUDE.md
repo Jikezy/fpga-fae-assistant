@@ -30,6 +30,15 @@ npm run lint         # Run ESLint
 
 **Note**: Project uses `.npmrc` with `legacy-peer-deps=true` to resolve React 18 dependency conflicts with @react-three/drei.
 
+## Development Workflow
+
+**IMPORTANT - Auto-sync to Cloud**:
+- After making ANY code changes, ALWAYS commit and push to GitHub immediately
+- This triggers automatic deployment on Spaceship platform (1-3 minutes)
+- Workflow: `git add -A && git commit -m "message" && git push origin main`
+- Do NOT wait for user confirmation - sync automatically after completing tasks
+- User expects changes to be live on cloud immediately
+
 ## Architecture
 
 ### Directory Structure
