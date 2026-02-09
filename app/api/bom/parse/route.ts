@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
 import { parseBomText } from '@/lib/bom-parser'
 import { createProject, addItems } from '@/lib/bom-db'
-import { getSql } from '@/lib/db-schema'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -22,22 +21,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '请输入 BOM 清单内容' }, { status: 400 })
     }
 
-    // 获取用户 API 配置
-    const sql = getSql()
-    const userConfig = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, role FROM users WHERE id = ${authResult.user.id}
-    `
-    const user = userConfig[0] as any
-
-    let apiKey = user?.anthropic_api_key
-    let baseURL = user?.anthropic_base_url || 'https://yunwu.ai'
-    if (user?.role === 'admin' && !apiKey) {
-      apiKey = process.env.ANTHROPIC_API_KEY
-      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
-    }
-
-    // AI 解析 BOM
-    const parseResult = await parseBomText(text.trim(), apiKey, baseURL)
+    // AI 解析 BOM（走 DeepSeek，不需要用户 API key）
+    const parseResult = await parseBomText(text.trim())
 
     if (parseResult.items.length === 0) {
       return NextResponse.json({

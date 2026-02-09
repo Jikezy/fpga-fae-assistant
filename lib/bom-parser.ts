@@ -1,9 +1,8 @@
 /**
  * BOM 解析引擎
- * 使用 AI 将用户输入的自然语言/文本解析为结构化元器件列表
+ * 使用 DeepSeek AI（免费）将用户输入的自然语言/文本解析为结构化元器件列表
+ * DeepSeek API 兼容 OpenAI 格式
  */
-
-import Anthropic from '@anthropic-ai/sdk'
 
 export interface BomItem {
   name: string        // 元器件名称
@@ -18,29 +17,7 @@ export interface ParseResult {
   warnings: string[]  // 解析中的警告（如规格不明确）
 }
 
-/**
- * 使用 AI 解析 BOM 文本
- */
-export async function parseBomText(
-  text: string,
-  apiKey?: string,
-  baseURL?: string
-): Promise<ParseResult> {
-  const key = apiKey || process.env.ANTHROPIC_API_KEY
-  const url = baseURL || process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
-
-  if (!key) {
-    // 降级到规则解析
-    return ruleBasedParse(text)
-  }
-
-  try {
-    const client = new Anthropic({ apiKey: key, baseURL: url })
-
-    const response = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-20250514',
-      max_tokens: 2048,
-      system: `你是一个电子元器件 BOM（物料清单）解析专家。用户会给你一段文字描述他们需要采购的电子元器件。
+const BOM_SYSTEM_PROMPT = `你是一个电子元器件 BOM（物料清单）解析专家。用户会给你一段文字描述他们需要采购的电子元器件。
 
 你的任务是将文本解析为结构化的 JSON 数组。
 
@@ -54,18 +31,56 @@ export async function parseBomText(
 如果某些信息不明确，在 warnings 数组中说明。
 
 只返回 JSON，不要其他文字。格式：
-{"items": [...], "warnings": ["..."]}`,
-      messages: [{ role: 'user', content: text }],
+{"items": [...], "warnings": ["..."]}`
+
+/**
+ * 使用 DeepSeek AI 解析 BOM 文本
+ * 优先走 DeepSeek（免费），失败降级到规则解析
+ */
+export async function parseBomText(text: string): Promise<ParseResult> {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+
+  if (!apiKey) {
+    console.warn('DEEPSEEK_API_KEY 未配置，使用规则解析')
+    return ruleBasedParse(text)
+  }
+
+  try {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: BOM_SYSTEM_PROMPT },
+          { role: 'user', content: text },
+        ],
+        max_tokens: 2048,
+        temperature: 0.1,
+      }),
     })
 
-    const content = response.content[0]
-    if (content.type !== 'text') {
+    if (!response.ok) {
+      const errText = await response.text()
+      console.error('DeepSeek API 请求失败:', response.status, errText)
+      return ruleBasedParse(text)
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content
+
+    if (!content) {
+      console.error('DeepSeek 返回内容为空')
       return ruleBasedParse(text)
     }
 
     // 提取 JSON
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/)
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
+      console.error('DeepSeek 返回内容不包含 JSON:', content)
       return ruleBasedParse(text)
     }
 
@@ -75,7 +90,7 @@ export async function parseBomText(
       warnings: parsed.warnings || [],
     }
   } catch (error) {
-    console.error('AI BOM 解析失败，降级到规则解析:', error)
+    console.error('DeepSeek BOM 解析失败，降级到规则解析:', error)
     return ruleBasedParse(text)
   }
 }

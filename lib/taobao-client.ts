@@ -1,6 +1,6 @@
 /**
  * 淘宝联盟（淘宝客）API 客户端
- * 未配置 API Key 时自动使用 mock 数据
+ * 未配置 API Key 时自动使用 mock 模式（只返回搜索链接，不返回假价格）
  */
 
 import { createHash } from 'crypto'
@@ -88,7 +88,7 @@ class TaobaoClient {
    */
   async searchProducts(params: SearchParams): Promise<TaobaoProduct[]> {
     if (this.isMock) {
-      return this.mockSearch(params.keyword, params.pageSize || 10)
+      return this.mockSearch(params.keyword)
     }
 
     try {
@@ -121,7 +121,7 @@ class TaobaoClient {
       }))
     } catch (error) {
       console.error('淘宝 API 调用失败，降级到 mock:', error)
-      return this.mockSearch(params.keyword, params.pageSize || 10)
+      return this.mockSearch(params.keyword)
     }
   }
 
@@ -130,7 +130,7 @@ class TaobaoClient {
    */
   async createTaoToken(url: string, title: string): Promise<string> {
     if (this.isMock) {
-      return `￥mock${Math.random().toString(36).substring(2, 8)}￥`
+      return ''
     }
 
     try {
@@ -152,82 +152,25 @@ class TaobaoClient {
   }
 
   /**
-   * Mock 搜索数据 - 电子元器件
+   * Mock 模式：不返回假价格，只提供淘宝搜索链接
    */
-  private mockSearch(keyword: string, count: number): TaobaoProduct[] {
-    const kw = keyword.toLowerCase()
-
-    // 基于关键词生成合理的 mock 数据
-    const mockDb: Record<string, Array<{ title: string; price: string; origPrice: string; sales: string; shop: string }>> = {
-      stm32: [
-        { title: 'STM32F103C8T6 最小系统板 ARM 核心板 STM32开发板', price: '8.50', origPrice: '12.00', sales: '3000+', shop: '深圳芯片直销店' },
-        { title: 'STM32F103C8T6 芯片 LQFP48 单片机 全新原装', price: '5.80', origPrice: '8.00', sales: '5000+', shop: '优信电子' },
-        { title: 'STM32F103C8T6 开发板 带ST-Link下载器 送教程', price: '25.00', origPrice: '35.00', sales: '800+', shop: '正点原子旗舰店' },
-      ],
-      '电容': [
-        { title: '0805贴片电容 100nF 104 50V X7R 全系列', price: '0.01', origPrice: '0.03', sales: '50000+', shop: '华创电子元件' },
-        { title: '贴片电容包 0805 常用37种各20只共740只', price: '12.80', origPrice: '18.00', sales: '2000+', shop: '深圳元器件批发' },
-        { title: '直插电解电容 10uF-1000uF 常用12种共120只', price: '6.50', origPrice: '9.00', sales: '3500+', shop: '电子之家' },
-      ],
-      '电阻': [
-        { title: '0805贴片电阻 10K 1% 全系列 100只', price: '1.50', origPrice: '3.00', sales: '20000+', shop: '华创电子元件' },
-        { title: '贴片电阻包 0805 常用55种各50只共2750只', price: '15.80', origPrice: '22.00', sales: '5000+', shop: '深圳元器件批发' },
-        { title: '金属膜电阻包 1/4W 常用30种各20只共600只', price: '8.80', origPrice: '12.00', sales: '8000+', shop: '电子之家' },
-      ],
-      '稳压': [
-        { title: 'AMS1117-3.3V 稳压模块 LDO 降压板 SOT-223', price: '0.80', origPrice: '1.50', sales: '10000+', shop: '优信电子' },
-        { title: 'LM7805 三端稳压器 5V稳压模块 TO-220', price: '0.50', origPrice: '1.00', sales: '15000+', shop: '华创电子元件' },
-        { title: 'DC-DC降压模块 LM2596 可调稳压 送散热片', price: '3.50', origPrice: '5.00', sales: '6000+', shop: '深圳模块专营' },
-      ],
-      '杜邦线': [
-        { title: '杜邦线 母对母 20cm 40P彩色排线', price: '2.50', origPrice: '4.00', sales: '30000+', shop: '电子之家' },
-        { title: '杜邦线套装 公对公+公对母+母对母 各40根', price: '6.80', origPrice: '9.00', sales: '12000+', shop: '优信电子' },
-        { title: '杜邦线 母对母 10/20/30cm 可选长度', price: '1.80', origPrice: '3.00', sales: '25000+', shop: '深圳线材批发' },
-      ],
-      '排针': [
-        { title: '2.54mm排针 单排直针 1x40P 镀金 10根', price: '1.50', origPrice: '3.00', sales: '40000+', shop: '华创电子元件' },
-        { title: '排针排母套装 单排双排 2.54mm 常用合集', price: '5.80', origPrice: '8.00', sales: '8000+', shop: '深圳元器件批发' },
-      ],
-      'led': [
-        { title: 'LED发光二极管 5mm 红绿黄蓝白 各20只共100只', price: '3.50', origPrice: '5.00', sales: '20000+', shop: '电子之家' },
-        { title: '0805贴片LED 红色 100只', price: '2.00', origPrice: '3.50', sales: '15000+', shop: '华创电子元件' },
-      ],
-    }
-
-    // 匹配关键词
-    let results: typeof mockDb['stm32'] = []
-    for (const [key, items] of Object.entries(mockDb)) {
-      if (kw.includes(key) || key.includes(kw)) {
-        results = items
-        break
-      }
-    }
-
-    // 如果没有匹配到，生成通用结果
-    if (results.length === 0) {
-      results = [
-        { title: `${keyword} 电子元器件 全新原装正品`, price: '5.00', origPrice: '8.00', sales: '1000+', shop: '优信电子' },
-        { title: `${keyword} 模块 开发板配件`, price: '12.00', origPrice: '18.00', sales: '500+', shop: '深圳芯片直销店' },
-        { title: `${keyword} 配件包 常用套装`, price: '8.50', origPrice: '12.00', sales: '800+', shop: '电子之家' },
-      ]
-    }
-
-    return results.slice(0, count).map((item, i) => ({
-      itemId: `mock_${Date.now()}_${i}`,
-      title: item.title,
-      price: item.price,
-      originalPrice: item.origPrice,
-      sales: item.sales,
-      shopName: item.shop,
-      shopScore: (4.7 + Math.random() * 0.3).toFixed(1),
+  private mockSearch(keyword: string): TaobaoProduct[] {
+    return [{
+      itemId: `mock_${Date.now()}`,
+      title: keyword,
+      price: '',
+      originalPrice: '',
+      sales: '',
+      shopName: '',
+      shopScore: '',
       imageUrl: '',
       buyUrl: `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`,
       taoToken: '',
       couponInfo: '',
-      couponAmount: '0',
-      commissionRate: '0',
+      couponAmount: '',
+      commissionRate: '',
       platform: 'taobao' as const,
-    }))
+    }]
   }
 }
 
