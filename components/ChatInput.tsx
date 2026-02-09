@@ -38,8 +38,8 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-4">
-      <div className="flex gap-3 items-end bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl p-4 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] focus-within:border-blue-300 focus-within:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all">
+    <div className="max-w-4xl mx-auto px-2 py-2 sm:px-4 sm:py-4">
+      <div className="flex gap-2 sm:gap-3 items-end bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] focus-within:border-blue-300 focus-within:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all">
         <textarea
           ref={textareaRef}
           value={input}

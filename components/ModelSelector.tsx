@@ -41,7 +41,7 @@ export default function ModelSelector({ currentModel, onModelChange }: ModelSele
         </svg>
         <div className="text-left">
           <div className="text-sm font-medium text-gray-900">{selectedModel.name}</div>
-          <div className="text-xs text-gray-500">{selectedModel.description}</div>
+          <div className="text-xs text-gray-500 hidden sm:block">{selectedModel.description}</div>
         </div>
         <svg
           className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -59,7 +59,7 @@ export default function ModelSelector({ currentModel, onModelChange }: ModelSele
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-96 overflow-y-auto">
+          <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-96 overflow-y-auto">
             <div className="p-2">
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
                 选择模型

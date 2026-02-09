@@ -146,7 +146,7 @@ USB Type-C 接口模块 x2`
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl p-8 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)]"
+            className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl p-4 sm:p-8 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)]"
           >
             {/* 项目名称 */}
             <div className="mb-6">
@@ -228,7 +228,7 @@ USB Type-C 接口模块 x2`
                   onDragLeave={() => setDragOver(false)}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+                  className={`border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center cursor-pointer transition-all ${
                     dragOver
                       ? 'border-orange-400 bg-orange-50/50'
                       : selectedFile

@@ -91,7 +91,7 @@ export default function LandingPage() {
       {/* Main Content */}
       <div className="relative z-10">
         {/* Hero Section */}
-        <section className="container mx-auto px-4 pt-20 pb-32">
+        <section className="container mx-auto px-4 pt-12 pb-16 sm:pt-20 sm:pb-32">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -117,7 +117,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight"
+              className="text-4xl sm:text-5xl md:text-7xl font-bold text-gray-900 mb-6 leading-tight"
             >
               FPGA 技术专家
               <br />
@@ -125,7 +125,7 @@ export default function LandingPage() {
                 AI 智能助手
               </span>
               <br />
-              <span className="text-3xl md:text-4xl bg-gradient-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent">
+              <span className="text-2xl sm:text-3xl md:text-4xl bg-gradient-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent">
                 + BOM 智能采购
               </span>
             </motion.h1>
@@ -135,7 +135,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.6 }}
-              className="text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto"
+              className="text-lg sm:text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto"
             >
               基于 Claude AI + RAG 技术，提供专业的 FPGA 技术咨询与电子元器件智能采购服务
             </motion.p>
@@ -184,7 +184,7 @@ export default function LandingPage() {
             transition={{ delay: 0.7, duration: 0.8 }}
             className="mt-20 max-w-3xl mx-auto"
           >
-            <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-200/60 p-8">
+            <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] border border-gray-200/60 p-4 sm:p-8">
               {/* User Message */}
               <div className="flex justify-end mb-4">
                 <div className="bg-gradient-to-br from-purple-100 to-purple-50 px-6 py-4 rounded-2xl rounded-tr-md max-w-md">
@@ -219,7 +219,7 @@ export default function LandingPage() {
             transition={{ duration: 0.6 }}
             className="text-center mb-16"
           >
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4">
               强大的 AI 能力
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
@@ -236,7 +236,7 @@ export default function LandingPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1, duration: 0.5 }}
                 whileHover={{ y: -8, transition: { duration: 0.2 } }}
-                className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl p-8 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_40px_rgba(124,58,237,0.15)] hover:border-purple-300 transition-all"
+                className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl p-5 sm:p-8 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_40px_rgba(124,58,237,0.15)] hover:border-purple-300 transition-all"
               >
                 <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg">
                   {feature.icon}
@@ -300,7 +300,7 @@ export default function LandingPage() {
             transition={{ duration: 0.6 }}
             className="max-w-4xl mx-auto"
           >
-            <div className="bg-gradient-to-br from-purple-600 to-purple-500 rounded-3xl p-12 md:p-16 text-center shadow-[0_20px_60px_rgba(124,58,237,0.3)] relative overflow-hidden">
+            <div className="bg-gradient-to-br from-purple-600 to-purple-500 rounded-3xl p-6 sm:p-12 md:p-16 text-center shadow-[0_20px_60px_rgba(124,58,237,0.3)] relative overflow-hidden">
               {/* Decorative Elements */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-700/20 rounded-full blur-3xl"></div>

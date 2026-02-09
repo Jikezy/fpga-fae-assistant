@@ -209,7 +209,7 @@ export default function ProjectDetailPage() {
 
       <div className="relative z-10">
         {/* Header */}
-        <header className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] border-b border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] px-6 py-4">
+        <header className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] border-b border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/bom" className="text-gray-500 hover:text-gray-700 transition-colors">
@@ -292,8 +292,8 @@ export default function ProjectDetailPage() {
         {/* Items Table */}
         <div className="container mx-auto px-4 pb-8 max-w-6xl">
           <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-2xl border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.08)] overflow-hidden">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500">
+            {/* Table Header - hidden on mobile */}
+            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500">
               <div className="col-span-1">#</div>
               <div className="col-span-3">元器件</div>
               <div className="col-span-2">规格</div>
@@ -310,7 +310,8 @@ export default function ProjectDetailPage() {
 
               return (
                 <div key={item.id}>
-                  <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-100 items-center hover:bg-orange-50/30 transition-colors">
+                  {/* Desktop table row */}
+                  <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-100 items-center hover:bg-orange-50/30 transition-colors">
                     <div className="col-span-1 text-sm text-gray-400">{index + 1}</div>
                     <div className="col-span-3">
                       <p className="font-medium text-gray-800 text-sm">{item.parsed_name || item.raw_input}</p>
@@ -371,23 +372,75 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
 
+                  {/* Mobile card layout */}
+                  <div className="md:hidden px-4 py-3 border-b border-gray-100">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-800 text-sm truncate">{item.parsed_name || item.raw_input}</p>
+                        {item.parsed_spec && <p className="text-xs text-gray-500 mt-0.5">{item.parsed_spec}</p>}
+                      </div>
+                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0">x{item.quantity}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {item.best_price ? (
+                          <span className="text-xs font-bold text-orange-600">
+                            {apiConfigured ? '' : '~'}¥{item.best_price} / 小计 ¥{(item.best_price * item.quantity).toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">未搜索</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => searchItem(item)}
+                        disabled={searchingId === item.id}
+                        className="px-3 py-2 bg-orange-50 text-orange-600 text-xs font-medium rounded-lg hover:bg-orange-100 transition-all disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {searchingId === item.id ? (
+                          <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        )}
+                        搜索
+                      </button>
+                      <a
+                        href={searchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
+                      >
+                        去淘宝搜
+                      </a>
+                      {item.search_results && item.search_results.length > 0 && (
+                        <button
+                          onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}
+                          className="px-3 py-2 bg-gray-50 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-100 transition-all"
+                        >
+                          {expandedItem === item.id ? '收起' : `${item.search_results.length}个结果`}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* 展开的搜索结果 */}
                   {expandedItem === item.id && item.search_results && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="bg-gray-50/50 px-6 py-4 border-b border-gray-200"
+                      className="bg-gray-50/50 px-4 sm:px-6 py-4 border-b border-gray-200"
                     >
                       <div className="space-y-3">
                         {item.search_results.map((product: Product, pi: number) => (
                           <div
                             key={pi}
-                            className="flex items-center justify-between bg-white rounded-xl p-4 border border-gray-100 hover:border-orange-200 transition-all"
+                            className="flex flex-col sm:flex-row sm:items-center justify-between bg-white rounded-xl p-4 border border-gray-100 hover:border-orange-200 transition-all gap-3"
                           >
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-gray-800 mb-1">{product.title}</p>
-                              <div className="flex items-center gap-3 text-xs text-gray-500">
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                 <span className="px-1.5 py-0.5 rounded text-xs bg-orange-50 text-orange-600">
                                   淘宝
                                 </span>
@@ -398,9 +451,9 @@ export default function ProjectDetailPage() {
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-4 ml-4">
-                              <div className="text-right">
-                                <p className="text-lg font-bold text-orange-600">
+                            <div className="flex items-center gap-4 sm:ml-4">
+                              <div className="text-left sm:text-right">
+                                <p className="text-base sm:text-lg font-bold text-orange-600">
                                   {apiConfigured ? '' : '~'}¥{product.price}
                                 </p>
                                 {product.originalPrice !== product.price && (

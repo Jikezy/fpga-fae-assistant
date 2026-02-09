@@ -60,7 +60,7 @@ export default function BomPage() {
 
       <div className="relative z-10">
         {/* Header */}
-        <header className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] border-b border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] px-6 py-4 flex items-center justify-between">
+        <header className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] border-b border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/chat" className="text-gray-500 hover:text-gray-700 transition-colors">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,7 +73,7 @@ export default function BomPage() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-400 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
+              className="px-3 py-2 sm:px-5 sm:py-2.5 bg-gradient-to-r from-orange-500 to-orange-400 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all"
             >
               + 新建采购清单
             </motion.button>
@@ -128,7 +128,7 @@ export default function BomPage() {
                           {statusMap[project.status]?.label || project.status}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500">
                         <span>{project.item_count || 0} 种元器件</span>
                         {project.total_estimated_price && (
                           <span className="text-orange-600 font-medium">

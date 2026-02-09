@@ -62,7 +62,7 @@ export default function RegisterPage() {
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-md relative z-10"
       >
-        <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] p-8 border border-gray-200/60">
+        <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] p-5 sm:p-8 border border-gray-200/60">
           {/* Logo */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
