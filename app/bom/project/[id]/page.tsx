@@ -50,13 +50,15 @@ export default function ProjectDetailPage() {
   const [items, setItems] = useState<BomItem[]>([])
   const [totalPrice, setTotalPrice] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [apiConfigured, setApiConfigured] = useState(false)
   const [searchingId, setSearchingId] = useState<string | null>(null)
   const [searchAllLoading, setSearchAllLoading] = useState(false)
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     fetchProject()
-  }, [projectId])
+  }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProject = async () => {
     try {
@@ -87,25 +89,36 @@ export default function ProjectDetailPage() {
       })
       const data = await res.json()
 
-      // 更新本地状态
-      setItems(prev => prev.map(i => {
-        if (i.id === item.id) {
-          const products = data.products || []
-          const best = products[0]
-          return {
-            ...i,
-            search_results: products,
-            best_price: best ? parseFloat(best.price) : null,
-            buy_url: best?.buyUrl || null,
-            tao_token: best?.taoToken || null,
-            status: products.length > 0 ? 'found' : 'pending',
-          }
-        }
-        return i
-      }))
+      // 记录 API 是否已配置
+      if (data.apiConfigured !== undefined) {
+        setApiConfigured(data.apiConfigured)
+      }
 
-      // 重新计算总价
-      recalcTotal()
+      // 更新本地状态
+      setItems(prev => {
+        const updated = prev.map(i => {
+          if (i.id === item.id) {
+            const products = data.products || []
+            const best = products[0]
+            return {
+              ...i,
+              search_results: products,
+              best_price: best ? parseFloat(best.price) : null,
+              buy_url: best?.buyUrl || null,
+              tao_token: best?.taoToken || null,
+              status: products.length > 0 ? 'found' : 'pending',
+            }
+          }
+          return i
+        })
+        // 重算总价
+        let total = 0
+        for (const it of updated) {
+          if (it.best_price) total += it.best_price * it.quantity
+        }
+        setTotalPrice(total)
+        return updated
+      })
     } catch (error) {
       console.error('搜索失败:', error)
     } finally {
@@ -118,53 +131,60 @@ export default function ProjectDetailPage() {
     for (const item of items) {
       if (item.status === 'pending' || !item.search_results) {
         await searchItem(item)
-        // 间隔一小段时间避免请求过快
         await new Promise(r => setTimeout(r, 500))
       }
     }
     setSearchAllLoading(false)
-    recalcTotal()
   }
 
-  const recalcTotal = () => {
-    setItems(prev => {
-      let total = 0
-      for (const item of prev) {
-        if (item.best_price) {
-          total += item.best_price * item.quantity
-        }
-      }
-      setTotalPrice(total)
-      return prev
-    })
-  }
+  // 生成淘宝搜索链接
+  const getTaobaoSearchUrl = (keyword: string) =>
+    `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`
 
-  const copyAllTaoTokens = () => {
-    const tokens = items
-      .filter(i => i.tao_token)
-      .map(i => `${i.parsed_name}: ${i.tao_token}`)
-      .join('\n')
+  // 复制所有购买链接
+  const copyAllLinks = () => {
+    const hasRealTokens = items.some(i => i.tao_token && !i.tao_token.startsWith('￥demo'))
+    let text: string
 
-    if (tokens) {
-      navigator.clipboard.writeText(tokens)
-      alert('已复制所有淘口令到剪贴板')
+    if (hasRealTokens) {
+      // 有真实淘口令时复制淘口令
+      text = items
+        .filter(i => i.tao_token)
+        .map(i => `${i.parsed_name} x${i.quantity}: ${i.tao_token}`)
+        .join('\n')
     } else {
-      alert('暂无可复制的淘口令，请先搜索')
+      // 没有真实淘口令时复制搜索链接
+      text = items
+        .map(i => {
+          const keyword = i.search_keyword || i.parsed_name
+          const url = i.buy_url || getTaobaoSearchUrl(keyword)
+          return `${i.parsed_name || i.raw_input} x${i.quantity}: ${url}`
+        })
+        .join('\n')
+    }
+
+    if (text) {
+      navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
   }
 
   const exportCSV = () => {
-    const headers = ['元器件', '规格', '数量', '单价(元)', '小计(元)', '购买链接']
-    const rows = items.map(item => [
-      item.parsed_name || item.raw_input,
-      item.parsed_spec || '',
-      String(item.quantity),
-      item.best_price ? String(item.best_price) : '未搜索',
-      item.best_price ? String((item.best_price * item.quantity).toFixed(2)) : '',
-      item.buy_url || '',
-    ])
+    const headers = ['元器件', '规格', '数量', '参考单价(元)', '参考小计(元)', '淘宝搜索链接']
+    const rows = items.map(item => {
+      const keyword = item.search_keyword || item.parsed_name || item.raw_input
+      return [
+        item.parsed_name || item.raw_input,
+        item.parsed_spec || '',
+        String(item.quantity),
+        item.best_price ? String(item.best_price) : '',
+        item.best_price ? String((item.best_price * item.quantity).toFixed(2)) : '',
+        item.buy_url || getTaobaoSearchUrl(keyword),
+      ]
+    })
 
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -204,16 +224,32 @@ export default function ProjectDetailPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* 总价 */}
               {totalPrice > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-2">
-                  <span className="text-sm text-gray-600">估算总价：</span>
+                  <span className="text-sm text-gray-600">{apiConfigured ? '估算总价：' : '参考总价：'}</span>
                   <span className="text-lg font-bold text-orange-600">¥{totalPrice.toFixed(2)}</span>
                 </div>
               )}
             </div>
           </div>
         </header>
+
+        {/* Mock 模式提示 */}
+        {!apiConfigured && items.some(i => i.search_results) && (
+          <div className="container mx-auto px-4 pt-4 max-w-6xl">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-blue-800">当前为参考价格模式</p>
+                <p className="text-sm text-blue-600 mt-1">
+                  价格为参考值，点击「去淘宝搜」可查看实时价格。配置淘宝联盟 API Key 后将自动获取实时数据和真实淘口令。
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="container mx-auto px-4 py-4 max-w-6xl">
@@ -233,11 +269,14 @@ export default function ProjectDetailPage() {
             </motion.button>
 
             <button
-              onClick={copyAllTaoTokens}
+              onClick={copyAllLinks}
               className="px-5 py-2.5 bg-white/80 backdrop-blur-sm border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-white transition-all flex items-center gap-2"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-              复制全部淘口令
+              {copied ? (
+                <><svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> 已复制</>
+              ) : (
+                <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg> {apiConfigured ? '复制全部淘口令' : '复制全部链接'}</>
+              )}
             </button>
 
             <button
@@ -259,128 +298,132 @@ export default function ProjectDetailPage() {
               <div className="col-span-3">元器件</div>
               <div className="col-span-2">规格</div>
               <div className="col-span-1">数量</div>
-              <div className="col-span-1">单价</div>
+              <div className="col-span-1">{apiConfigured ? '单价' : '参考价'}</div>
               <div className="col-span-1">小计</div>
               <div className="col-span-3">操作</div>
             </div>
 
             {/* Table Body */}
-            {items.map((item, index) => (
-              <div key={item.id}>
-                <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-100 items-center hover:bg-orange-50/30 transition-colors">
-                  <div className="col-span-1 text-sm text-gray-400">{index + 1}</div>
-                  <div className="col-span-3">
-                    <p className="font-medium text-gray-800 text-sm">{item.parsed_name || item.raw_input}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-gray-600">{item.parsed_spec || '-'}</p>
-                  </div>
-                  <div className="col-span-1">
-                    <span className="text-sm text-gray-800">{item.quantity}</span>
-                  </div>
-                  <div className="col-span-1">
-                    {item.best_price ? (
-                      <span className="text-sm font-medium text-orange-600">¥{item.best_price}</span>
-                    ) : (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div className="col-span-1">
-                    {item.best_price ? (
-                      <span className="text-sm font-bold text-orange-600">
-                        ¥{(item.best_price * item.quantity).toFixed(2)}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-gray-400">-</span>
-                    )}
-                  </div>
-                  <div className="col-span-3 flex items-center gap-2">
-                    <button
-                      onClick={() => searchItem(item)}
-                      disabled={searchingId === item.id}
-                      className="px-3 py-1.5 bg-orange-50 text-orange-600 text-xs font-medium rounded-lg hover:bg-orange-100 transition-all disabled:opacity-50 flex items-center gap-1"
-                    >
-                      {searchingId === item.id ? (
-                        <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                      )}
-                      搜索
-                    </button>
+            {items.map((item, index) => {
+              const keyword = item.search_keyword || item.parsed_name || item.raw_input
+              const searchUrl = item.buy_url || getTaobaoSearchUrl(keyword)
 
-                    {item.buy_url && (
+              return (
+                <div key={item.id}>
+                  <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-gray-100 items-center hover:bg-orange-50/30 transition-colors">
+                    <div className="col-span-1 text-sm text-gray-400">{index + 1}</div>
+                    <div className="col-span-3">
+                      <p className="font-medium text-gray-800 text-sm">{item.parsed_name || item.raw_input}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-sm text-gray-600">{item.parsed_spec || '-'}</p>
+                    </div>
+                    <div className="col-span-1">
+                      <span className="text-sm text-gray-800">{item.quantity}</span>
+                    </div>
+                    <div className="col-span-1">
+                      {item.best_price ? (
+                        <span className="text-sm font-medium text-orange-600">¥{item.best_price}</span>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </div>
+                    <div className="col-span-1">
+                      {item.best_price ? (
+                        <span className="text-sm font-bold text-orange-600">
+                          ¥{(item.best_price * item.quantity).toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </div>
+                    <div className="col-span-3 flex items-center gap-2">
+                      <button
+                        onClick={() => searchItem(item)}
+                        disabled={searchingId === item.id}
+                        className="px-3 py-1.5 bg-orange-50 text-orange-600 text-xs font-medium rounded-lg hover:bg-orange-100 transition-all disabled:opacity-50 flex items-center gap-1"
+                      >
+                        {searchingId === item.id ? (
+                          <div className="w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        )}
+                        搜索
+                      </button>
+
                       <a
-                        href={item.buy_url}
+                        href={searchUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
-                        onClick={(e) => e.stopPropagation()}
                       >
-                        去购买
+                        去淘宝搜
                       </a>
-                    )}
 
-                    {item.search_results && item.search_results.length > 0 && (
-                      <button
-                        onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}
-                        className="px-3 py-1.5 bg-gray-50 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-100 transition-all"
-                      >
-                        {expandedItem === item.id ? '收起' : `${item.search_results.length}个结果`}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 展开的搜索结果 */}
-                {expandedItem === item.id && item.search_results && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="bg-gray-50/50 px-6 py-4 border-b border-gray-200"
-                  >
-                    <div className="space-y-3">
-                      {item.search_results.map((product: Product, pi: number) => (
-                        <div
-                          key={pi}
-                          className="flex items-center justify-between bg-white rounded-xl p-4 border border-gray-100 hover:border-orange-200 transition-all"
+                      {item.search_results && item.search_results.length > 0 && (
+                        <button
+                          onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}
+                          className="px-3 py-1.5 bg-gray-50 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-100 transition-all"
                         >
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-800 mb-1">{product.title}</p>
-                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                              <span className={`px-1.5 py-0.5 rounded text-xs ${product.platform === 'tmall' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'}`}>
-                                {product.platform === 'tmall' ? '天猫' : '淘宝'}
-                              </span>
-                              <span>{product.shopName}</span>
-                              <span>月销 {product.sales}</span>
-                              {product.couponInfo && (
-                                <span className="text-red-500">{product.couponInfo}</span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 ml-4">
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-orange-600">¥{product.price}</p>
-                              {product.originalPrice !== product.price && (
-                                <p className="text-xs text-gray-400 line-through">¥{product.originalPrice}</p>
-                              )}
-                            </div>
-                            <a
-                              href={product.buyUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-400 text-white text-sm font-medium rounded-lg hover:shadow-lg transition-all"
-                            >
-                              去购买
-                            </a>
-                          </div>
-                        </div>
-                      ))}
+                          {expandedItem === item.id ? '收起' : `${item.search_results.length}个结果`}
+                        </button>
+                      )}
                     </div>
-                  </motion.div>
-                )}
-              </div>
-            ))}
+                  </div>
+
+                  {/* 展开的搜索结果 */}
+                  {expandedItem === item.id && item.search_results && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="bg-gray-50/50 px-6 py-4 border-b border-gray-200"
+                    >
+                      <div className="space-y-3">
+                        {item.search_results.map((product: Product, pi: number) => (
+                          <div
+                            key={pi}
+                            className="flex items-center justify-between bg-white rounded-xl p-4 border border-gray-100 hover:border-orange-200 transition-all"
+                          >
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-gray-800 mb-1">{product.title}</p>
+                              <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <span className="px-1.5 py-0.5 rounded text-xs bg-orange-50 text-orange-600">
+                                  淘宝
+                                </span>
+                                <span>{product.shopName}</span>
+                                <span>月销 {product.sales}</span>
+                                {product.couponInfo && (
+                                  <span className="text-red-500">{product.couponInfo}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 ml-4">
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-orange-600">
+                                  {apiConfigured ? '' : '~'}¥{product.price}
+                                </p>
+                                {product.originalPrice !== product.price && (
+                                  <p className="text-xs text-gray-400 line-through">¥{product.originalPrice}</p>
+                                )}
+                              </div>
+                              <a
+                                href={product.buyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-400 text-white text-sm font-medium rounded-lg hover:shadow-lg transition-all whitespace-nowrap"
+                              >
+                                去淘宝搜
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

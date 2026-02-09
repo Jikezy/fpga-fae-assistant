@@ -221,12 +221,12 @@ class TaobaoClient {
       shopName: item.shop,
       shopScore: (4.7 + Math.random() * 0.3).toFixed(1),
       imageUrl: '',
-      buyUrl: `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}`,
-      taoToken: `￥demo${Math.random().toString(36).substring(2, 6)}￥`,
-      couponInfo: Math.random() > 0.5 ? '满10减1' : '',
-      couponAmount: Math.random() > 0.5 ? '1' : '0',
-      commissionRate: (Math.random() * 10 + 1).toFixed(1),
-      platform: Math.random() > 0.3 ? 'taobao' as const : 'tmall' as const,
+      buyUrl: `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`,
+      taoToken: '',
+      couponInfo: '',
+      couponAmount: '0',
+      commissionRate: '0',
+      platform: 'taobao' as const,
     }))
   }
 }
