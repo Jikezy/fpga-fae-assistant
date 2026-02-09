@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import LiquidGlassBackground from '@/components/LiquidGlassBackground'
@@ -44,6 +44,7 @@ interface Project {
 export default function ProjectDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const projectId = params.id as string
 
   const [project, setProject] = useState<Project | null>(null)
@@ -58,9 +59,21 @@ export default function ProjectDetailPage() {
   const [editingKeyword, setEditingKeyword] = useState<string | null>(null)
   const [editKeywordValue, setEditKeywordValue] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [engineHint, setEngineHint] = useState<string | null>(null)
 
   useEffect(() => {
     fetchProject()
+    // 从 URL 读取解析引擎信息并显示提示
+    const engine = searchParams.get('engine')
+    if (engine) {
+      if (engine === 'deepseek') {
+        setEngineHint('DeepSeek AI 解析完成')
+      } else if (engine === 'rule') {
+        setEngineHint('规则引擎解析完成（DeepSeek 不可用，已降级）')
+      }
+      // 5秒后自动消失
+      setTimeout(() => setEngineHint(null), 5000)
+    }
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProject = async () => {
@@ -296,6 +309,31 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </header>
+
+        {/* 解析引擎提示 */}
+        {engineHint && (
+          <div className="container mx-auto px-4 pt-4 max-w-6xl">
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`rounded-xl p-3 flex items-center gap-2 text-sm ${
+                engineHint.includes('DeepSeek AI')
+                  ? 'bg-green-50 border border-green-200 text-green-700'
+                  : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
+              }`}
+            >
+              {engineHint.includes('DeepSeek AI') ? (
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              ) : (
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+              )}
+              {engineHint}
+              <button onClick={() => setEngineHint(null)} className="ml-auto text-gray-400 hover:text-gray-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </motion.div>
+          </div>
+        )}
 
         {/* Mock 模式提示 */}
         {isMock && (

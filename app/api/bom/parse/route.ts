@@ -48,6 +48,7 @@ export async function POST(req: NextRequest) {
       project,
       items,
       warnings: parseResult.warnings,
+      parseEngine: parseResult.parseEngine,
     })
   } catch (error) {
     console.error('BOM 解析错误:', error)

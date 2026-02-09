@@ -72,7 +72,7 @@ USB Type-C 接口模块 x2`
 
       const data = await res.json()
       if (!res.ok) { setError(data.error || '解析失败'); return }
-      router.push(`/bom/project/${data.project.id}`)
+      router.push(`/bom/project/${data.project.id}?engine=${data.parseEngine || 'unknown'}`)
     } catch (err) {
       setError('网络错误，请重试')
       console.error(err)
@@ -102,7 +102,7 @@ USB Type-C 接口模块 x2`
 
       const data = await res.json()
       if (!res.ok) { setError(data.error || '解析失败'); return }
-      router.push(`/bom/project/${data.project.id}`)
+      router.push(`/bom/project/${data.project.id}?engine=${data.parseEngine || 'unknown'}`)
     } catch (err) {
       setError('网络错误，请重试')
       console.error(err)

@@ -15,6 +15,7 @@ export interface BomItem {
 export interface ParseResult {
   items: BomItem[]
   warnings: string[]  // 解析中的警告（如规格不明确）
+  parseEngine: 'deepseek' | 'rule' // 解析引擎：deepseek AI 或规则降级
 }
 
 const BOM_SYSTEM_PROMPT = `你是一个电子元器件 BOM（物料清单）解析专家。用户会给你一段文字描述他们需要采购的电子元器件。
@@ -42,7 +43,8 @@ export async function parseBomText(text: string): Promise<ParseResult> {
 
   if (!apiKey) {
     console.warn('DEEPSEEK_API_KEY 未配置，使用规则解析')
-    return ruleBasedParse(text)
+    const result = ruleBasedParse(text)
+    return { ...result, parseEngine: 'rule' }
   }
 
   try {
@@ -66,7 +68,8 @@ export async function parseBomText(text: string): Promise<ParseResult> {
     if (!response.ok) {
       const errText = await response.text()
       console.error('DeepSeek API 请求失败:', response.status, errText)
-      return ruleBasedParse(text)
+      const result = ruleBasedParse(text)
+      return { ...result, parseEngine: 'rule' }
     }
 
     const data = await response.json()
@@ -74,24 +77,28 @@ export async function parseBomText(text: string): Promise<ParseResult> {
 
     if (!content) {
       console.error('DeepSeek 返回内容为空')
-      return ruleBasedParse(text)
+      const result = ruleBasedParse(text)
+      return { ...result, parseEngine: 'rule' }
     }
 
     // 提取 JSON
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       console.error('DeepSeek 返回内容不包含 JSON:', content)
-      return ruleBasedParse(text)
+      const result = ruleBasedParse(text)
+      return { ...result, parseEngine: 'rule' }
     }
 
     const parsed = JSON.parse(jsonMatch[0]) as ParseResult
     return {
       items: parsed.items || [],
       warnings: parsed.warnings || [],
+      parseEngine: 'deepseek',
     }
   } catch (error) {
     console.error('DeepSeek BOM 解析失败，降级到规则解析:', error)
-    return ruleBasedParse(text)
+    const result = ruleBasedParse(text)
+    return { ...result, parseEngine: 'rule' }
   }
 }
 
@@ -155,5 +162,5 @@ function ruleBasedParse(text: string): ParseResult {
     warnings.push('未能识别到任何元器件，请检查输入格式')
   }
 
-  return { items, warnings }
+  return { items, warnings, parseEngine: 'rule' }
 }

@@ -102,6 +102,7 @@ export async function POST(req: NextRequest) {
       items,
       extractedText: extractedText.substring(0, 500),
       warnings: parseResult.warnings,
+      parseEngine: parseResult.parseEngine,
       fileInfo: {
         name: file.name,
         size: file.size,
