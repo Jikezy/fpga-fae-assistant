@@ -93,7 +93,68 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_embeddings_user_id ON embeddings(user_id)
     `
 
-    console.log('数据库表初始化成功')
+    // ============ BOM 采购模块表 ============
+
+    // BOM 项目表
+    await sql`
+      CREATE TABLE IF NOT EXISTS bom_projects (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        source_text TEXT,
+        status TEXT NOT NULL DEFAULT 'draft',
+        total_estimated_price DECIMAL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    // BOM 元器件明细表
+    await sql`
+      CREATE TABLE IF NOT EXISTS bom_items (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES bom_projects(id) ON DELETE CASCADE,
+        raw_input TEXT NOT NULL,
+        parsed_name TEXT,
+        parsed_spec TEXT,
+        search_keyword TEXT,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL DEFAULT 'pending',
+        best_price DECIMAL,
+        best_source TEXT,
+        buy_url TEXT,
+        tao_token TEXT,
+        search_results JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    // 搜索结果缓存表
+    await sql`
+      CREATE TABLE IF NOT EXISTS price_cache (
+        id TEXT PRIMARY KEY,
+        keyword TEXT NOT NULL,
+        platform TEXT NOT NULL DEFAULT 'taobao',
+        results JSONB NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    // BOM 相关索引
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_bom_projects_user_id ON bom_projects(user_id)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_bom_items_project_id ON bom_items(project_id)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_price_cache_keyword ON price_cache(keyword, platform)
+    `
+
+    console.log('数据库表初始化成功（含BOM模块）')
     return { success: true }
   } catch (error) {
     console.error('数据库初始化失败:', error)

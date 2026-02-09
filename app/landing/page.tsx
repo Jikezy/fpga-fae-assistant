@@ -45,6 +45,15 @@ export default function LandingPage() {
     {
       icon: (
         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+        </svg>
+      ),
+      title: 'BOM 智能采购',
+      description: '输入元器件清单，AI 自动解析并在淘宝搜索最优价格，一键生成采购方案'
+    },
+    {
+      icon: (
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
       ),
@@ -115,6 +124,10 @@ export default function LandingPage() {
               <span className="bg-gradient-to-r from-purple-600 to-purple-400 bg-clip-text text-transparent">
                 AI 智能助手
               </span>
+              <br />
+              <span className="text-3xl md:text-4xl bg-gradient-to-r from-orange-500 to-orange-400 bg-clip-text text-transparent">
+                + BOM 智能采购
+              </span>
             </motion.h1>
 
             {/* Subheadline */}
@@ -124,7 +137,7 @@ export default function LandingPage() {
               transition={{ delay: 0.4, duration: 0.6 }}
               className="text-xl md:text-2xl text-gray-600 mb-12 max-w-2xl mx-auto"
             >
-              基于 Claude AI + RAG 技术，提供专业的 FPGA 现场应用工程师智能咨询服务
+              基于 Claude AI + RAG 技术，提供专业的 FPGA 技术咨询与电子元器件智能采购服务
             </motion.p>
 
             {/* CTA Buttons */}
@@ -150,6 +163,15 @@ export default function LandingPage() {
                   className="px-8 py-4 bg-white/80 backdrop-blur-[60px] text-gray-800 text-lg font-semibold rounded-2xl border border-gray-300 hover:border-purple-400 hover:bg-white/90 transition-all shadow-lg"
                 >
                   登录账号
+                </motion.button>
+              </Link>
+              <Link href="/bom">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-8 py-4 bg-gradient-to-r from-orange-500 to-orange-400 text-white text-lg font-semibold rounded-2xl shadow-[0_8px_30px_rgba(249,115,22,0.4)] hover:shadow-[0_12px_40px_rgba(249,115,22,0.5)] transition-all"
+                >
+                  BOM 采购 →
                 </motion.button>
               </Link>
             </motion.div>

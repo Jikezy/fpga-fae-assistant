@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'FPGA FAE助手 - AI驱动的技术咨询',
-  description: '基于Claude AI的FPGA现场应用工程师智能助手，提供专业的技术咨询和文档检索服务',
+  title: 'AI 智能助手 - FPGA技术咨询 & BOM智能采购',
+  description: '基于Claude AI的智能助手平台，提供FPGA技术咨询和电子元器件BOM智能采购服务',
 }
 
 export default function RootLayout({
