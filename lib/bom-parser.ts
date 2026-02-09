@@ -99,7 +99,7 @@ function ruleBasedParse(text: string): ParseResult {
     const quantity = qtyMatch ? parseInt(qtyMatch[1] || qtyMatch[2]) : 1
 
     // 去掉数量部分
-    let name = line
+    const name = line
       .replace(/[x×*]\s*\d+/gi, '')
       .replace(/\d+\s*[个只片颗根排条套件块]/g, '')
       .trim()

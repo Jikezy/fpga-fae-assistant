@@ -124,8 +124,8 @@ USB Type-C 接口模块 x2`
             <div className="mb-6 bg-orange-50/80 border border-orange-200/60 rounded-xl p-4">
               <h4 className="text-sm font-medium text-orange-800 mb-2">支持的输入格式：</h4>
               <ul className="text-sm text-orange-700 space-y-1">
-                <li>- 每行一个元器件，支持 "x数量" 或 "数量个/只" 格式</li>
-                <li>- 支持自然语言描述，如 "STM32的最小系统板要两块"</li>
+                <li>- 每行一个元器件，支持 &ldquo;x数量&rdquo; 或 &ldquo;数量个/只&rdquo; 格式</li>
+                <li>- 支持自然语言描述，如 &ldquo;STM32的最小系统板要两块&rdquo;</li>
                 <li>- AI 会自动识别元器件型号、规格、数量</li>
               </ul>
             </div>
