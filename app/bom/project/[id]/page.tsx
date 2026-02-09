@@ -140,12 +140,24 @@ export default function ProjectDetailPage() {
   const getTaobaoSearchUrl = (keyword: string) =>
     `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`
 
-  // 一键打开所有淘宝链接
+  // 一键打开所有淘宝链接（用延时绕过浏览器弹窗拦截）
   const openAllLinks = () => {
-    for (const item of items) {
+    const urls = items.map(item => {
       const keyword = item.search_keyword || item.parsed_name || item.raw_input
-      const url = (apiConfigured && item.buy_url) ? item.buy_url : getTaobaoSearchUrl(keyword)
-      window.open(url, '_blank')
+      return (apiConfigured && item.buy_url) ? item.buy_url : getTaobaoSearchUrl(keyword)
+    })
+    // 第一个立即打开（用户点击上下文内，不会被拦截）
+    if (urls.length > 0) {
+      window.open(urls[0], '_blank')
+    }
+    // 后续的用延时逐个打开
+    for (let i = 1; i < urls.length; i++) {
+      setTimeout(() => {
+        window.open(urls[i], '_blank')
+      }, i * 500)
+    }
+    if (urls.length > 1) {
+      alert(`正在打开 ${urls.length} 个链接，如果浏览器拦截了弹窗，请点击地址栏右侧的拦截提示，选择"始终允许"后重试。`)
     }
   }
 
