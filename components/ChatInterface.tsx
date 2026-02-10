@@ -12,27 +12,16 @@ export interface Message {
 }
 
 interface ChatInterfaceProps {
-  currentModel: string
   fullReadRequest?: string | null
   onFullReadComplete?: () => void
 }
 
-export default function ChatInterface({ currentModel, fullReadRequest, onFullReadComplete }: ChatInterfaceProps) {
-  // 获取模型友好名称
-  const getModelDisplayName = (modelId: string) => {
-    const names: Record<string, string> = {
-      'anthropic-claude-opus-4-6': 'Claude Opus 4.6',
-      'siliconflow-deepseek-ai/DeepSeek-V3': 'DeepSeek V3（免费）',
-      'siliconflow-Qwen/Qwen2.5-72B-Instruct': 'Qwen 2.5 72B（免费）',
-    }
-    return names[modelId] || modelId
-  }
-
+export default function ChatInterface({ fullReadRequest, onFullReadComplete }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: `你好！我是FPGA FAE助手，可以帮你查询文档、解答技术问题。\n\n📌 当前模型：**${getModelDisplayName(currentModel)}**`,
+      content: '你好！我是FPGA FAE助手，可以帮你查询文档、解答技术问题。\n\n请先在设置页面配置 AI 服务后开始使用。',
       timestamp: new Date(),
     },
   ])
@@ -41,18 +30,6 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const shouldAutoScrollRef = useRef(true)
-
-  // 当模型切换时更新欢迎消息
-  useEffect(() => {
-    setMessages([
-      {
-        id: '1',
-        role: 'assistant',
-        content: `你好！我是FPGA FAE助手，可以帮你查询文档、解答技术问题。\n\n📌 当前模型：**${getModelDisplayName(currentModel)}**`,
-        timestamp: new Date(),
-      },
-    ])
-  }, [currentModel])
 
   // 检查是否接近底部
   const checkIfNearBottom = () => {
@@ -102,7 +79,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: `📄 完整阅读：${filename}`,
+      content: `完整阅读：${filename}`,
       timestamp: new Date(),
     }
     setMessages((prev) => [...prev, userMessage])
@@ -127,6 +104,9 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       if (!response.ok) {
         // 尝试读取错误详情
         const errorData = await response.json().catch(() => null)
+        if (errorData?.needsConfig) {
+          throw new Error('AI 未配置，请前往设置页面配置 AI 服务')
+        }
         const errorMessage = errorData?.message || errorData?.error || 'API请求失败'
         throw new Error(errorMessage)
       }
@@ -165,7 +145,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
               const parsed = JSON.parse(data)
 
               if (parsed.type === 'cost_estimate') {
-                costEstimate = `💰 费用预估：¥${parsed.totalCost}（约${parsed.estimatedPages}页）\n\n`
+                costEstimate = `费用预估：¥${parsed.totalCost}（约${parsed.estimatedPages}页）\n\n`
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessageId
@@ -212,7 +192,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: `抱歉，完整阅读失败。\n\n错误详情：${errorMessage}\n\n💡 提示：完整阅读功能会自动选择可用的AI模型。如果持续失败，请稍后重试。`,
+          content: `抱歉，完整阅读失败。\n\n错误详情：${errorMessage}\n\n如果提示 AI 未配置，请前往**设置页面**配置您的 AI 服务。`,
           timestamp: new Date(),
         },
       ])
@@ -237,13 +217,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
     abortControllerRef.current = new AbortController()
 
     try {
-      // 解析模型 ID 获取 provider 和 model
-      // 格式: provider-modelName (例如: siliconflow-deepseek-ai/DeepSeek-V3)
-      const dashIndex = currentModel.indexOf('-')
-      const provider = currentModel.substring(0, dashIndex)
-      const modelName = currentModel.substring(dashIndex + 1)
-
-      // 调用API
+      // 调用API（BYOK：只发 messages，后端从 DB 读用户配置）
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -254,8 +228,6 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
             role: m.role,
             content: m.content,
           })),
-          provider,
-          model: modelName,
         }),
         signal: abortControllerRef.current.signal,
       })
@@ -263,6 +235,9 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
       if (!response.ok) {
         // 尝试读取错误详情
         const errorData = await response.json().catch(() => null)
+        if (errorData?.needsConfig) {
+          throw new Error('AI 未配置，请前往设置页面配置 AI 服务')
+        }
         const errorMessage = errorData?.message || errorData?.error || 'API请求失败'
         throw new Error(errorMessage)
       }
@@ -324,15 +299,12 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
 
       // 显示具体的错误信息
       const errorMessage = error instanceof Error ? error.message : '未知错误'
-      const isFreeModel = currentModel.startsWith('siliconflow-')
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: isFreeModel
-            ? `抱歉，发生了错误。\n\n错误详情：${errorMessage}\n\n💡 提示：免费模型可能暂时繁忙，请稍后重试。`
-            : `抱歉，发生了错误。\n\n错误详情：${errorMessage}\n\n💡 提示：如果提示缺少API配置，请前往设置页面配置您的云雾AI API Key，或切换到免费模型。`,
+          content: `抱歉，发生了错误。\n\n错误详情：${errorMessage}\n\n如果提示 AI 未配置，请前往**设置页面**配置您的 AI 服务（Base URL、API Key、模型名称）。`,
           timestamp: new Date(),
         },
       ])

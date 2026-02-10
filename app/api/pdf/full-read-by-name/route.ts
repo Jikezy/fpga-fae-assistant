@@ -25,11 +25,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 获取用户的API配置
+    // 获取用户的AI配置
     const { getSql } = await import('@/lib/db-schema')
     const sql = getSql()
     const userConfig = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, role
+      SELECT anthropic_api_key, anthropic_base_url, ai_model
       FROM users
       WHERE id = ${authResult.user.id}
     `
@@ -42,30 +42,17 @@ export async function POST(req: NextRequest) {
     }
 
     const user = userConfig[0] as any
+    const apiKey = user.anthropic_api_key
+    const baseURL = user.anthropic_base_url
+    const model = user.ai_model
 
-    // 决定使用哪个 AI 服务
-    let useProvider: 'anthropic' | 'siliconflow' = 'anthropic'
-    let apiKey = user.anthropic_api_key
-    let baseURL = user.anthropic_base_url || 'https://yunwu.ai'
-
-    if (user.role === 'admin' && !apiKey) {
-      apiKey = process.env.ANTHROPIC_API_KEY
-      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
-    }
-
-    // 无 Claude key 时降级到 SiliconFlow 免费模型
-    if (!apiKey) {
-      if (process.env.SILICONFLOW_API_KEY) {
-        useProvider = 'siliconflow'
-        apiKey = process.env.SILICONFLOW_API_KEY
-        baseURL = 'https://api.siliconflow.cn/v1'
-      } else {
-        return NextResponse.json({
-          error: 'AI服务不可用',
-          message: '请在设置中配置 Claude API Key，或联系管理员启用免费模型',
-          needsConfig: true,
-        }, { status: 403 })
-      }
+    // BYOK：未配置则 403
+    if (!apiKey || !baseURL || !model) {
+      return NextResponse.json({
+        error: 'AI 未配置',
+        message: '请先在设置页面配置 AI 服务（Base URL、API Key、模型名称）',
+        needsConfig: true,
+      }, { status: 403 })
     }
 
     // 从数据库获取该文件的所有文档片段（仅当前用户的）
@@ -93,21 +80,13 @@ export async function POST(req: NextRequest) {
 
     const totalPages = Math.max(...documents.map((doc: any) => doc.page || 0))
 
-    // 估算费用（Claude Opus 4.6 定价）
-    const estimatedInputTokens = fullContent.length / 4 // 粗略估算：4字符=1token
+    // 估算token
+    const estimatedInputTokens = fullContent.length / 4
     const estimatedOutputTokens = 1500
-    const inputCost = (estimatedInputTokens / 1000000) * 18 // ¥18/百万tokens
-    const outputCost = (estimatedOutputTokens / 1000000) * 90 // ¥90/百万tokens
-    const totalCost = inputCost + outputCost
 
     // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
-    const aiService = new AIService({
-      provider: useProvider,
-      model: useProvider === 'siliconflow' ? 'deepseek-ai/DeepSeek-V3' : 'claude-opus-4-6',
-      apiKey,
-      baseURL,
-    })
+    const aiService = new AIService({ apiKey, baseURL, model })
 
     const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'
 
@@ -129,7 +108,7 @@ export async function POST(req: NextRequest) {
             estimatedPages: totalPages,
             estimatedInputTokens: Math.ceil(estimatedInputTokens),
             estimatedOutputTokens,
-            totalCost: totalCost.toFixed(2),
+            totalCost: '0.00',
           })
           controller.enqueue(encoder.encode(`data: ${costInfo}\n\n`))
 

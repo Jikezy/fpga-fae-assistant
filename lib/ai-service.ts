@@ -1,9 +1,7 @@
 /**
  * AI 服务抽象层
- * 支持 Anthropic Claude + SiliconFlow (OpenAI 兼容)
+ * BYOK（自带 Key）— 统一使用 OpenAI 兼容格式调用
  */
-
-import Anthropic from '@anthropic-ai/sdk'
 
 // AI 消息接口
 export interface AIMessage {
@@ -11,50 +9,26 @@ export interface AIMessage {
   content: string
 }
 
-// AI 服务配置
+// AI 服务配置（BYOK：三个必填字段）
 export interface AIServiceConfig {
-  provider: 'anthropic' | 'siliconflow'
-  apiKey?: string
-  baseURL?: string
-  model?: string
+  apiKey: string
+  baseURL: string
+  model: string
 }
 
 // 流式响应回调
 export type StreamCallback = (chunk: string) => void
 
 /**
- * AI 服务类
+ * AI 服务类（OpenAI 兼容格式）
  */
 export class AIService {
   private config: AIServiceConfig
-  private anthropic?: Anthropic
 
-  constructor(config?: Partial<AIServiceConfig>) {
-    const provider = config?.provider || 'anthropic'
-
-    if (provider === 'siliconflow') {
-      this.config = {
-        provider: 'siliconflow',
-        apiKey: config?.apiKey || process.env.SILICONFLOW_API_KEY,
-        baseURL: config?.baseURL || 'https://api.siliconflow.cn/v1',
-        model: config?.model || 'deepseek-ai/DeepSeek-V3',
-      }
-    } else {
-      this.config = {
-        provider: 'anthropic',
-        apiKey: config?.apiKey || process.env.ANTHROPIC_API_KEY,
-        baseURL: config?.baseURL || process.env.ANTHROPIC_BASE_URL || '',
-        model: config?.model || process.env.ANTHROPIC_MODEL || 'claude-opus-4-20250514',
-      }
-      // 初始化 Anthropic 客户端
-      if (this.config.apiKey) {
-        this.anthropic = new Anthropic({
-          apiKey: this.config.apiKey,
-          baseURL: this.config.baseURL,
-        })
-      }
-    }
+  constructor(config: AIServiceConfig) {
+    this.config = config
   }
+
   /**
    * 获取系统提示词
    */
@@ -70,43 +44,14 @@ export class AIService {
   }
 
   /**
-   * 流式聊天（Anthropic）
+   * 流式聊天（OpenAI 兼容格式）
    */
-  private async streamChatAnthropic(
-    messages: AIMessage[],
-    onChunk: StreamCallback
-  ): Promise<void> {
-    if (!this.anthropic) {
-      throw new Error('Anthropic 客户端未初始化')
-    }
-
-    const response = await this.anthropic.messages.create({
-      model: this.config.model!,
-      max_tokens: 4096,
-      messages: messages,
-      system: this.getSystemPrompt(),
-      stream: true,
-    })
-
-    for await (const event of response) {
-      if (
-        event.type === 'content_block_delta' &&
-        event.delta.type === 'text_delta'
-      ) {
-        onChunk(event.delta.text)
-      }
-    }
-  }
-
-  /**
-   * 流式聊天（OpenAI 兼容 — SiliconFlow）
-   */
-  private async streamChatOpenAICompatible(
+  async streamChat(
     messages: AIMessage[],
     onChunk: StreamCallback
   ): Promise<void> {
     if (!this.config.apiKey) {
-      throw new Error('SiliconFlow API Key 未配置')
+      throw new Error('API Key 未配置')
     }
 
     const response = await fetch(`${this.config.baseURL}/chat/completions`, {
@@ -128,7 +73,7 @@ export class AIService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '')
-      throw new Error(`SiliconFlow API 错误 (${response.status}): ${errorText}`)
+      throw new Error(`AI API 错误 (${response.status}): ${errorText}`)
     }
 
     const reader = response.body?.getReader()
@@ -163,33 +108,13 @@ export class AIService {
   }
 
   /**
-   * 流式聊天（统一接口）
-   */
-  async streamChat(messages: AIMessage[], onChunk: StreamCallback): Promise<void> {
-    if (this.config.provider === 'siliconflow') {
-      await this.streamChatOpenAICompatible(messages, onChunk)
-    } else {
-      await this.streamChatAnthropic(messages, onChunk)
-    }
-  }
-
-  /**
    * 检查服务是否可用
    */
   async checkHealth(): Promise<{ available: boolean; message: string }> {
-    try {
-      if (!this.config.apiKey) {
-        const providerName = this.config.provider === 'siliconflow' ? 'SILICONFLOW_API_KEY' : 'ANTHROPIC_API_KEY'
-        return { available: false, message: `未配置 ${providerName}` }
-      }
-      const providerLabel = this.config.provider === 'siliconflow' ? 'SiliconFlow' : 'Anthropic Claude'
-      return { available: true, message: `${providerLabel} 已配置` }
-    } catch (error) {
-      return {
-        available: false,
-        message: `健康检查失败: ${error instanceof Error ? error.message : '未知错误'}`,
-      }
+    if (!this.config.apiKey) {
+      return { available: false, message: 'API Key 未配置' }
     }
+    return { available: true, message: 'AI 服务已配置' }
   }
 
   /**
@@ -199,6 +124,3 @@ export class AIService {
     return { ...this.config }
   }
 }
-
-// 导出单例实例
-export const aiService = new AIService()

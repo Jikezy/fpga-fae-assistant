@@ -9,7 +9,6 @@ import PageTransition from '@/components/PageTransition'
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [currentModel, setCurrentModel] = useState('siliconflow-deepseek-ai/DeepSeek-V3')
   const [fullReadRequest, setFullReadRequest] = useState<string | null>(null)
 
   return (
@@ -33,14 +32,11 @@ export default function Home() {
           {/* 顶部导航 */}
           <Header
             onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-            currentModel={currentModel}
-            onModelChange={setCurrentModel}
           />
 
           {/* 聊天界面 */}
           <main className="flex-1 overflow-hidden">
             <ChatInterface
-              currentModel={currentModel}
               fullReadRequest={fullReadRequest}
               onFullReadComplete={() => setFullReadRequest(null)}
             />

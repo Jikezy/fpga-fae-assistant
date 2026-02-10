@@ -6,7 +6,7 @@ export const maxDuration = 60
 
 /**
  * 完整PDF阅读接口
- * 接收PDF文件，发送给Claude进行完整分析
+ * 接收PDF文件，使用用户配置的AI进行完整分析
  */
 export async function POST(req: NextRequest) {
   // 验证用户登录
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     // 获取文件大小（MB）
     const fileSizeMB = file.size / 1024 / 1024
 
-    // 限制文件大小为32MB（Claude的限制）
+    // 限制文件大小为32MB
     if (fileSizeMB > 32) {
       return NextResponse.json(
         { error: '文件大小超过32MB限制' },
@@ -45,52 +45,32 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 估算token数量和费用
-    // 粗略估算：1页PDF ≈ 1800 tokens
-    // 通过文件大小估算页数：1MB ≈ 10页
+    // 估算token数量
     const estimatedPages = Math.ceil(fileSizeMB * 10)
     const estimatedInputTokens = estimatedPages * 1800
-    const estimatedOutputTokens = 1500 // 假设回答1500 tokens
+    const estimatedOutputTokens = 1500
 
-    // Claude Opus 4.6 定价（云雾AI 50%折扣）
-    const inputCost = (estimatedInputTokens / 1000000) * 18 // ¥18/百万tokens
-    const outputCost = (estimatedOutputTokens / 1000000) * 90 // ¥90/百万tokens
-    const totalCost = inputCost + outputCost
-
-    // 获取用户的API配置
+    // 获取用户的AI配置
     const { getSql } = await import('@/lib/db-schema')
     const sql = getSql()
     const userConfig = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, role
+      SELECT anthropic_api_key, anthropic_base_url, ai_model
       FROM users
       WHERE id = ${authResult.user.id}
     `
 
     const user = userConfig.length > 0 ? (userConfig[0] as any) : null
+    const apiKey = user?.anthropic_api_key
+    const baseURL = user?.anthropic_base_url
+    const model = user?.ai_model
 
-    // 决定使用哪个 AI 服务
-    let useProvider: 'anthropic' | 'siliconflow' = 'anthropic'
-    let apiKey = user?.anthropic_api_key
-    let baseURL = user?.anthropic_base_url || 'https://yunwu.ai'
-
-    if (user?.role === 'admin' && !apiKey) {
-      apiKey = process.env.ANTHROPIC_API_KEY
-      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
-    }
-
-    // 无 Claude key 时降级到 SiliconFlow 免费模型
-    if (!apiKey) {
-      if (process.env.SILICONFLOW_API_KEY) {
-        useProvider = 'siliconflow'
-        apiKey = process.env.SILICONFLOW_API_KEY
-        baseURL = 'https://api.siliconflow.cn/v1'
-      } else {
-        return NextResponse.json({
-          error: 'AI服务不可用',
-          message: '请在设置中配置 Claude API Key，或联系管理员启用免费模型',
-          needsConfig: true,
-        }, { status: 403 })
-      }
+    // BYOK：未配置则 403
+    if (!apiKey || !baseURL || !model) {
+      return NextResponse.json({
+        error: 'AI 未配置',
+        message: '请先在设置页面配置 AI 服务（Base URL、API Key、模型名称）',
+        needsConfig: true,
+      }, { status: 403 })
     }
 
     // 读取PDF文件内容
@@ -98,12 +78,7 @@ export async function POST(req: NextRequest) {
 
     // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
-    const aiService = new AIService({
-      provider: useProvider,
-      model: useProvider === 'siliconflow' ? 'deepseek-ai/DeepSeek-V3' : 'claude-opus-4-6',
-      apiKey,
-      baseURL,
-    })
+    const aiService = new AIService({ apiKey, baseURL, model })
 
     // 创建流式响应
     const encoder = new TextEncoder()
@@ -116,13 +91,11 @@ export async function POST(req: NextRequest) {
             estimatedPages,
             estimatedInputTokens,
             estimatedOutputTokens,
-            totalCost: totalCost.toFixed(2),
+            totalCost: '0.00',
           })
           controller.enqueue(encoder.encode(`data: ${costInfo}\n\n`))
 
-          // 构建包含PDF的消息
-          // 注意：这里需要使用Anthropic的消息格式，支持PDF附件
-          // 简化版本：我们先提取PDF文本内容
+          // 提取PDF文本内容
           const { processPDF } = await import('@/lib/pdfProcessor')
           const buffer = Buffer.from(bytes)
           const processed = await processPDF(buffer, file.name)

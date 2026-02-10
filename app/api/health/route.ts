@@ -1,31 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { AIService } from '@/lib/ai-service'
+import { NextResponse } from 'next/server'
 
 /**
  * 健康检查 API
- * 用于检查 AI 服务是否可用
+ * 简单的服务存活检查
  */
-export async function GET(req: NextRequest) {
-  try {
-    const aiService = new AIService()
-    const health = await aiService.checkHealth()
-    const config = aiService.getConfig()
-
-    return NextResponse.json({
-      status: health.available ? 'healthy' : 'unhealthy',
-      provider: config.provider,
-      model: config.model,
-      message: health.message,
-      timestamp: new Date().toISOString(),
-    })
-  } catch (error) {
-    return NextResponse.json(
-      {
-        status: 'error',
-        message: error instanceof Error ? error.message : '未知错误',
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 }
-    )
-  }
+export async function GET() {
+  return NextResponse.json({
+    status: 'healthy',
+    message: 'BYOK 模式 — 用户自行配置 AI 服务',
+    timestamp: new Date().toISOString(),
+  })
 }

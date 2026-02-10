@@ -46,7 +46,12 @@ export async function POST(req: NextRequest) {
       ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES users(id) ON DELETE CASCADE
     `
 
-    // 4. 创建索引以提高查询性能
+    // 4. 添加 ai_model 字段（BYOK 改造）
+    await sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model TEXT
+    `
+
+    // 5. 创建索引以提高查询性能
     await sql`
       CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)
     `

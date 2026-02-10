@@ -154,6 +154,11 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_price_cache_keyword ON price_cache(keyword, platform)
     `
 
+    // 添加 ai_model 列（BYOK 改造）
+    await sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model TEXT
+    `
+
     console.log('数据库表初始化成功（含BOM模块）')
     return { success: true }
   } catch (error) {
