@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 // 预设平台配置
 const PRESETS = [
   { name: '云雾 AI', baseUrl: 'https://yunwu.ai/v1', model: 'claude-opus-4-20250514', hint: 'yunwu.ai/console 获取 Key' },
+  { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'claude-opus-4-20250514', hint: 'openclaudecode.cn 获取 Key' },
   { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key' },
   { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', hint: 'platform.deepseek.com 获取 Key' },
   { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-opus-4', hint: 'openrouter.ai 获取 Key' },
@@ -199,7 +200,7 @@ export default function SettingsPage() {
           {/* 预设平台 */}
           <div>
             <h2 className="text-lg font-semibold text-gray-100 mb-3">快速选择平台</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
               {PRESETS.map((preset) => (
                 <button
                   key={preset.name}
