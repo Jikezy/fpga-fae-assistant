@@ -60,19 +60,27 @@ export default function ProjectDetailPage() {
   const [editKeywordValue, setEditKeywordValue] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [engineHint, setEngineHint] = useState<string | null>(null)
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  const [visitedItems, setVisitedItems] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchProject()
-    // 从 URL 读取解析引擎信息并显示提示
+    // 从 localStorage 恢复已访问记录
+    try {
+      const saved = localStorage.getItem(`bom-visited-${projectId}`)
+      if (saved) setVisitedItems(new Set(JSON.parse(saved)))
+    } catch {}
+    // 从 URL 读取解析引擎信息
     const engine = searchParams.get('engine')
     if (engine) {
-      if (engine === 'deepseek') {
-        setEngineHint('DeepSeek AI 解析完成')
-      } else if (engine === 'rule') {
-        setEngineHint('规则引擎解析完成（DeepSeek 不可用，已降级）')
-      }
-      // 5秒后自动消失
-      setTimeout(() => setEngineHint(null), 5000)
+      const hint = engine === 'deepseek' ? 'deepseek' : 'rule'
+      setEngineHint(hint)
+      // 存到 localStorage 持久化
+      localStorage.setItem(`bom-engine-${projectId}`, hint)
+    } else {
+      // 尝试从 localStorage 恢复
+      const saved = localStorage.getItem(`bom-engine-${projectId}`)
+      if (saved) setEngineHint(saved)
     }
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -153,20 +161,54 @@ export default function ProjectDetailPage() {
   const getTaobaoSearchUrl = (keyword: string) =>
     `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`
 
-  // 一键打开所有淘宝链接（用延时绕过浏览器弹窗拦截）
-  const openAllLinks = () => {
-    const urls = items.map(item => {
+  // 标记元器件为已访问
+  const markVisited = (itemId: string) => {
+    setVisitedItems(prev => {
+      const next = new Set(prev)
+      next.add(itemId)
+      localStorage.setItem(`bom-visited-${projectId}`, JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  // 勾选/取消勾选
+  const toggleSelect = (itemId: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === items.length) {
+      setSelectedItems(new Set())
+    } else {
+      setSelectedItems(new Set(items.map(i => i.id)))
+    }
+  }
+
+  // 一键打开选中的淘宝链接（用延时绕过浏览器弹窗拦截）
+  const openSelectedLinks = () => {
+    const targetItems = selectedItems.size > 0
+      ? items.filter(i => selectedItems.has(i.id))
+      : items
+    const urls = targetItems.map(item => {
       const keyword = item.search_keyword || item.parsed_name || item.raw_input
       return (apiConfigured && item.buy_url) ? item.buy_url : getTaobaoSearchUrl(keyword)
     })
     // 第一个立即打开（用户点击上下文内，不会被拦截）
     if (urls.length > 0) {
       window.open(urls[0], '_blank')
+      markVisited(targetItems[0].id)
     }
     // 后续的用延时逐个打开
     for (let i = 1; i < urls.length; i++) {
+      const item = targetItems[i]
       setTimeout(() => {
         window.open(urls[i], '_blank')
+        markVisited(item.id)
       }, i * 500)
     }
     if (urls.length > 1) {
@@ -294,8 +336,24 @@ export default function ProjectDetailPage() {
                 </svg>
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">{project?.name}</h1>
-                <p className="text-sm text-gray-500">{items.length} 种元器件</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-gray-800">{project?.name}</h1>
+                  {engineHint && (
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      engineHint === 'deepseek'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {engineHint === 'deepseek' ? (
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      ) : (
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                      )}
+                      {engineHint === 'deepseek' ? 'DeepSeek AI 解析' : '规则引擎解析'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-500">{items.length} 种元器件{visitedItems.size > 0 && ` · 已查看 ${visitedItems.size}/${items.length}`}</p>
               </div>
             </div>
 
@@ -309,31 +367,6 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </header>
-
-        {/* 解析引擎提示 */}
-        {engineHint && (
-          <div className="container mx-auto px-4 pt-4 max-w-6xl">
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`rounded-xl p-3 flex items-center gap-2 text-sm ${
-                engineHint.includes('DeepSeek AI')
-                  ? 'bg-green-50 border border-green-200 text-green-700'
-                  : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
-              }`}
-            >
-              {engineHint.includes('DeepSeek AI') ? (
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              ) : (
-                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
-              )}
-              {engineHint}
-              <button onClick={() => setEngineHint(null)} className="ml-auto text-gray-400 hover:text-gray-600">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </motion.div>
-          </div>
-        )}
 
         {/* Mock 模式提示 */}
         {isMock && (
@@ -354,7 +387,7 @@ export default function ProjectDetailPage() {
 
         {/* Action Buttons */}
         <div className="container mx-auto px-4 py-4 max-w-6xl">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 items-center">
             {/* 真实 API 模式下才显示"一键搜索" */}
             {!isMock && (
               <motion.button
@@ -372,15 +405,15 @@ export default function ProjectDetailPage() {
               </motion.button>
             )}
 
-            {/* 一键打开所有淘宝链接 */}
+            {/* 一键打开选中/全部淘宝链接 */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={openAllLinks}
+              onClick={openSelectedLinks}
               className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-              一键打开所有链接
+              {selectedItems.size > 0 ? `打开选中 (${selectedItems.size})` : '一键打开所有链接'}
             </motion.button>
 
             <button
@@ -401,6 +434,21 @@ export default function ProjectDetailPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               导出 CSV
             </button>
+
+            {/* 已访问进度 + 清除 */}
+            {visitedItems.size > 0 && (
+              <button
+                onClick={() => {
+                  setVisitedItems(new Set())
+                  localStorage.removeItem(`bom-visited-${projectId}`)
+                }}
+                className="px-4 py-2.5 text-gray-500 text-sm hover:text-red-500 transition-colors flex items-center gap-1"
+                title="清除所有已查看标记"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                清除标记
+              </button>
+            )}
           </div>
         </div>
 
@@ -408,18 +456,26 @@ export default function ProjectDetailPage() {
         <div className="container mx-auto px-4 pb-8 max-w-6xl">
           <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-2xl border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.08)] overflow-hidden">
             {/* Table Header */}
-            <div className={`hidden md:grid gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500 ${isMock ? 'grid-cols-10' : 'grid-cols-12'}`}>
-              <div className="col-span-1">#</div>
-              <div className={isMock ? 'col-span-3' : 'col-span-3'}>元器件</div>
-              <div className="col-span-2">搜索关键词</div>
-              <div className="col-span-1">数量</div>
+            <div className={`hidden md:grid gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500 ${isMock ? 'grid-cols-12' : 'grid-cols-14'}`} style={{ gridTemplateColumns: isMock ? '32px 40px 3fr 2fr 60px 3fr' : '32px 40px 3fr 2fr 60px 1fr 1fr 3fr' }}>
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={selectedItems.size === items.length && items.length > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500"
+                />
+              </div>
+              <div>#</div>
+              <div>元器件</div>
+              <div>搜索关键词</div>
+              <div>数量</div>
               {!isMock && (
                 <>
-                  <div className="col-span-1">单价</div>
-                  <div className="col-span-1">小计</div>
+                  <div>单价</div>
+                  <div>小计</div>
                 </>
               )}
-              <div className="col-span-3">操作</div>
+              <div>操作</div>
             </div>
 
             {/* Table Body */}
@@ -430,13 +486,33 @@ export default function ProjectDetailPage() {
               return (
                 <div key={item.id}>
                   {/* Desktop table row */}
-                  <div className={`hidden md:grid gap-4 px-6 py-4 border-b border-gray-100 items-center hover:bg-orange-50/30 transition-colors ${isMock ? 'grid-cols-10' : 'grid-cols-12'}`}>
-                    <div className="col-span-1 text-sm text-gray-400">{index + 1}</div>
-                    <div className="col-span-3">
+                  <div
+                    className={`hidden md:grid gap-4 px-6 py-4 border-b border-gray-100 items-center transition-colors ${
+                      visitedItems.has(item.id)
+                        ? 'bg-green-50/40 hover:bg-green-50/60'
+                        : 'hover:bg-orange-50/30'
+                    }`}
+                    style={{ gridTemplateColumns: isMock ? '32px 40px 3fr 2fr 60px 3fr' : '32px 40px 3fr 2fr 60px 1fr 1fr 3fr' }}
+                  >
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={() => toggleSelect(item.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500"
+                      />
+                    </div>
+                    <div className="text-sm text-gray-400 flex items-center gap-1">
+                      {index + 1}
+                      {visitedItems.has(item.id) && (
+                        <svg className="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" /></svg>
+                      )}
+                    </div>
+                    <div>
                       <p className="font-medium text-gray-800 text-sm">{item.parsed_name || item.raw_input}</p>
                       {item.parsed_spec && <p className="text-xs text-gray-500 mt-0.5">{item.parsed_spec}</p>}
                     </div>
-                    <div className="col-span-2">
+                    <div>
                       {editingKeyword === item.id ? (
                         <input
                           type="text"
@@ -460,19 +536,19 @@ export default function ProjectDetailPage() {
                         </button>
                       )}
                     </div>
-                    <div className="col-span-1">
+                    <div>
                       <span className="text-sm text-gray-800">{item.quantity}</span>
                     </div>
                     {!isMock && (
                       <>
-                        <div className="col-span-1">
+                        <div>
                           {item.best_price ? (
                             <span className="text-sm font-medium text-orange-600">¥{item.best_price}</span>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
                           )}
                         </div>
-                        <div className="col-span-1">
+                        <div>
                           {item.best_price ? (
                             <span className="text-sm font-bold text-orange-600">
                               ¥{(item.best_price * item.quantity).toFixed(2)}
@@ -483,7 +559,7 @@ export default function ProjectDetailPage() {
                         </div>
                       </>
                     )}
-                    <div className="col-span-3 flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       {!isMock && (
                         <button
                           onClick={() => searchItem(item)}
@@ -503,9 +579,14 @@ export default function ProjectDetailPage() {
                         href={searchUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
+                        onClick={() => markVisited(item.id)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                          visitedItems.has(item.id)
+                            ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                        }`}
                       >
-                        去淘宝搜
+                        {visitedItems.has(item.id) ? '已查看' : '去淘宝搜'}
                       </a>
 
                       <button
@@ -533,11 +614,26 @@ export default function ProjectDetailPage() {
                   </div>
 
                   {/* Mobile card layout */}
-                  <div className="md:hidden px-4 py-3 border-b border-gray-100">
+                  <div className={`md:hidden px-4 py-3 border-b border-gray-100 ${
+                    visitedItems.has(item.id) ? 'bg-green-50/40' : ''
+                  }`}>
                     <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-800 text-sm truncate">{item.parsed_name || item.raw_input}</p>
-                        {item.parsed_spec && <p className="text-xs text-gray-500 mt-0.5">{item.parsed_spec}</p>}
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(item.id)}
+                          onChange={() => toggleSelect(item.id)}
+                          className="w-4 h-4 mt-0.5 rounded border-gray-300 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <p className="font-medium text-gray-800 text-sm truncate">{item.parsed_name || item.raw_input}</p>
+                            {visitedItems.has(item.id) && (
+                              <svg className="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" /></svg>
+                            )}
+                          </div>
+                          {item.parsed_spec && <p className="text-xs text-gray-500 mt-0.5">{item.parsed_spec}</p>}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2 flex-shrink-0">
                         <span className="text-xs text-gray-500">x{item.quantity}</span>
@@ -601,9 +697,14 @@ export default function ProjectDetailPage() {
                         href={searchUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-2 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
+                        onClick={() => markVisited(item.id)}
+                        className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${
+                          visitedItems.has(item.id)
+                            ? 'bg-green-50 text-green-600 hover:bg-green-100'
+                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                        }`}
                       >
-                        去淘宝搜
+                        {visitedItems.has(item.id) ? '已查看' : '去淘宝搜'}
                       </a>
                       {!isMock && item.search_results && item.search_results.length > 0 && (
                         <button
