@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
     const { messages } = await req.json()
 
     // 获取用户的AI配置
-    const { getSql } = await import('@/lib/db-schema')
+    const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
+    await ensureAiModelColumn()
     const sql = getSql()
     const userConfig = await sql`
       SELECT anthropic_api_key, anthropic_base_url, ai_model

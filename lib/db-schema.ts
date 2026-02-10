@@ -178,3 +178,18 @@ export function getSql() {
   }
   return _sql
 }
+
+/**
+ * 确保 ai_model 列存在（BYOK 迁移，仅执行一次）
+ */
+let _aiModelMigrated = false
+export async function ensureAiModelColumn() {
+  if (_aiModelMigrated) return
+  try {
+    const sql = getSql()
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model TEXT`
+    _aiModelMigrated = true
+  } catch (e) {
+    console.error('ai_model 列迁移失败:', e)
+  }
+}

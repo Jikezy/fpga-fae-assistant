@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
-import { getSql } from '@/lib/db-schema'
+import { getSql, ensureAiModelColumn } from '@/lib/db-schema'
 
 export const runtime = 'nodejs'
 
@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    await ensureAiModelColumn()
     const sql = getSql()
     const result = await sql`
       SELECT anthropic_api_key, anthropic_base_url, ai_model
@@ -56,6 +57,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const { api_key, base_url, model_name } = await req.json()
+
+    await ensureAiModelColumn()
 
     if (!api_key) {
       return NextResponse.json(
