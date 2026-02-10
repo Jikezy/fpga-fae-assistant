@@ -1,5 +1,6 @@
 import { getSql } from './db-schema'
 import { randomBytes, createHash } from 'crypto'
+import bcrypt from 'bcryptjs'
 
 export interface User {
   id: string
@@ -16,19 +17,41 @@ export interface Session {
   created_at: Date
 }
 
+const BCRYPT_ROUNDS = 12
+
 /**
- * 简单的密码哈希（使用SHA-256）
- * 注意：生产环境建议使用 bcrypt
+ * 密码哈希（bcrypt，加盐，cost=12）
  */
-export function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex')
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, BCRYPT_ROUNDS)
 }
 
 /**
- * 验证密码
+ * 验证密码（兼容旧 SHA-256 哈希，验证通过后自动升级为 bcrypt）
  */
-export function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash
+export async function verifyPassword(password: string, hash: string, userId?: string): Promise<boolean> {
+  // 新格式: bcrypt（以 $2a$ 或 $2b$ 开头）
+  if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
+    return bcrypt.compare(password, hash)
+  }
+
+  // 旧格式: SHA-256（64位十六进制）— 兼容迁移
+  const sha256Hash = createHash('sha256').update(password).digest('hex')
+  if (sha256Hash === hash) {
+    // 验证通过，自动升级为 bcrypt
+    if (userId) {
+      try {
+        const newHash = await hashPassword(password)
+        const sql = getSql()
+        await sql`UPDATE users SET password_hash = ${newHash} WHERE id = ${userId}`
+      } catch (e) {
+        console.error('密码哈希升级失败:', e)
+      }
+    }
+    return true
+  }
+
+  return false
 }
 
 /**
@@ -44,7 +67,7 @@ export function generateToken(): string {
 export async function createUser(email: string, password: string, role: 'admin' | 'user' = 'user'): Promise<User> {
   const sql = getSql()
   const id = randomBytes(16).toString('hex')
-  const passwordHash = hashPassword(password)
+  const passwordHash = await hashPassword(password)
 
   await sql`
     INSERT INTO users (id, email, password_hash, role)

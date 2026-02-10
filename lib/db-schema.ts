@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless'
+import { neon, NeonQueryFunction } from '@neondatabase/serverless'
 
 // 获取数据库连接字符串（Vercel会自动注入POSTGRES_URL）
 const getDatabaseUrl = () => {
@@ -163,8 +163,13 @@ export async function initializeDatabase() {
 }
 
 /**
- * 获取SQL客户端
+ * 获取SQL客户端（单例，复用同一连接）
  */
+let _sql: NeonQueryFunction<false, false> | null = null
+
 export function getSql() {
-  return neon(getDatabaseUrl())
+  if (!_sql) {
+    _sql = neon(getDatabaseUrl())
+  }
+  return _sql
 }

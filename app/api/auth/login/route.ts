@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { findUserByEmail, verifyPassword, createSession } from '@/lib/auth'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
+    // 频率限制：同一 IP 15分钟内最多 10 次登录尝试
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    const { limited, retryAfterMs } = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000)
+    if (limited) {
+      return NextResponse.json(
+        { error: `登录尝试过于频繁，请 ${Math.ceil(retryAfterMs / 60000)} 分钟后重试` },
+        { status: 429 }
+      )
+    }
+
     const { email, password } = await req.json()
 
     // 验证输入
@@ -24,8 +35,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 验证密码
-    if (!verifyPassword(password, user.password_hash)) {
+    // 验证密码（bcrypt，兼容旧 SHA-256 自动升级）
+    if (!await verifyPassword(password, user.password_hash, user.id)) {
       return NextResponse.json(
         { error: '邮箱或密码错误' },
         { status: 401 }
