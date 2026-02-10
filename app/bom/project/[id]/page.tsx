@@ -65,6 +65,7 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     fetchProject()
+    checkApiStatus()
     // 从 localStorage 恢复已访问记录
     try {
       const saved = localStorage.getItem(`bom-visited-${projectId}`)
@@ -83,6 +84,16 @@ export default function ProjectDetailPage() {
       if (saved) setEngineHint(saved)
     }
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const checkApiStatus = async () => {
+    try {
+      const res = await fetch('/api/bom/search')
+      if (res.ok) {
+        const data = await res.json()
+        setApiConfigured(data.apiConfigured)
+      }
+    } catch {}
+  }
 
   const fetchProject = async () => {
     try {
@@ -161,6 +172,12 @@ export default function ProjectDetailPage() {
   const getTaobaoSearchUrl = (keyword: string) =>
     `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`
 
+  const getLcscSearchUrl = (keyword: string) =>
+    `https://so.szlcsc.com/global.html?k=${encodeURIComponent(keyword)}`
+
+  const get1688SearchUrl = (keyword: string) =>
+    `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(keyword)}`
+
   // 标记元器件为已访问
   const markVisited = (itemId: string) => {
     setVisitedItems(prev => {
@@ -189,14 +206,19 @@ export default function ProjectDetailPage() {
     }
   }
 
-  // 一键打开选中的淘宝链接（用延时绕过浏览器弹窗拦截）
-  const openSelectedLinks = () => {
+  // 一键打开选中的链接（默认立创商城，电子元器件最佳平台）
+  const openSelectedLinks = (platform: 'lcsc' | '1688' | 'taobao' = 'lcsc') => {
     const targetItems = selectedItems.size > 0
       ? items.filter(i => selectedItems.has(i.id))
       : items
+    const getUrl = (keyword: string) => {
+      if (platform === 'lcsc') return getLcscSearchUrl(keyword)
+      if (platform === '1688') return get1688SearchUrl(keyword)
+      return getTaobaoSearchUrl(keyword)
+    }
     const urls = targetItems.map(item => {
       const keyword = item.search_keyword || item.parsed_name || item.raw_input
-      return (apiConfigured && item.buy_url) ? item.buy_url : getTaobaoSearchUrl(keyword)
+      return (apiConfigured && item.buy_url) ? item.buy_url : getUrl(keyword)
     })
     // 第一个立即打开（用户点击上下文内，不会被拦截）
     if (urls.length > 0) {
@@ -216,13 +238,15 @@ export default function ProjectDetailPage() {
     }
   }
 
-  // 复制所有链接
+  // 复制所有链接（含多平台）
   const copyAllLinks = () => {
     const text = items
       .map(i => {
         const keyword = i.search_keyword || i.parsed_name || i.raw_input
-        const url = (apiConfigured && i.buy_url) ? i.buy_url : getTaobaoSearchUrl(keyword)
-        return `${i.parsed_name || i.raw_input} x${i.quantity}: ${url}`
+        const lcsc = getLcscSearchUrl(keyword)
+        const ali = get1688SearchUrl(keyword)
+        const taobao = getTaobaoSearchUrl(keyword)
+        return `${i.parsed_name || i.raw_input} x${i.quantity}:\n  立创: ${lcsc}\n  1688: ${ali}\n  淘宝: ${taobao}`
       })
       .join('\n')
 
@@ -234,19 +258,20 @@ export default function ProjectDetailPage() {
   }
 
   const exportCSV = () => {
-    const isMock = !apiConfigured
-    const headers = isMock
-      ? ['元器件', '规格', '数量', '搜索关键词', '淘宝搜索链接']
-      : ['元器件', '规格', '数量', '单价(元)', '小计(元)', '购买链接']
+    const headers = apiConfigured
+      ? ['元器件', '规格', '数量', '单价(元)', '小计(元)', '立创商城', '1688', '淘宝']
+      : ['元器件', '规格', '数量', '搜索关键词', '立创商城', '1688', '淘宝']
 
     const rows = items.map(item => {
       const keyword = item.search_keyword || item.parsed_name || item.raw_input
-      if (isMock) {
+      if (!apiConfigured) {
         return [
           item.parsed_name || item.raw_input,
           item.parsed_spec || '',
           String(item.quantity),
           keyword,
+          getLcscSearchUrl(keyword),
+          get1688SearchUrl(keyword),
           getTaobaoSearchUrl(keyword),
         ]
       }
@@ -256,6 +281,8 @@ export default function ProjectDetailPage() {
         String(item.quantity),
         item.best_price ? String(item.best_price) : '',
         item.best_price ? String((item.best_price * item.quantity).toFixed(2)) : '',
+        getLcscSearchUrl(keyword),
+        get1688SearchUrl(keyword),
         item.buy_url || getTaobaoSearchUrl(keyword),
       ]
     })
@@ -368,22 +395,20 @@ export default function ProjectDetailPage() {
           </div>
         </header>
 
-        {/* Mock 模式提示 */}
-        {isMock && (
-          <div className="container mx-auto px-4 pt-4 max-w-6xl">
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-              <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-blue-800">淘宝联盟 API 未配置</p>
-                <p className="text-sm text-blue-600 mt-1">
-                  点击「去淘宝搜」可跳转淘宝查看实时价格。配置淘宝联盟 API Key 后将自动获取实时价格和购买链接。
-                </p>
-              </div>
+        {/* 使用提示 */}
+        <div className="container mx-auto px-4 pt-4 max-w-6xl">
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-medium text-blue-800">采购提示</p>
+              <p className="text-sm text-blue-600 mt-1">
+                点击「立创」搜索电子元器件（推荐），「1688」适合批量采购，「淘宝」适合零散购买。可点击搜索关键词进行编辑优化。
+              </p>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Action Buttons */}
         <div className="container mx-auto px-4 py-4 max-w-6xl">
@@ -405,15 +430,38 @@ export default function ProjectDetailPage() {
               </motion.button>
             )}
 
-            {/* 一键打开选中/全部淘宝链接 */}
+            {/* 多平台一键打开按钮 */}
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              onClick={openSelectedLinks}
-              className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg flex items-center gap-2"
+              onClick={() => openSelectedLinks('lcsc')}
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-xl shadow-lg flex items-center gap-2"
+              title="在立创商城批量搜索（电子元器件首选）"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-              {selectedItems.size > 0 ? `打开选中 (${selectedItems.size})` : '一键打开所有链接'}
+              {selectedItems.size > 0 ? `立创搜 (${selectedItems.size})` : '立创商城搜索'}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => openSelectedLinks('1688')}
+              className="px-5 py-2.5 bg-gradient-to-r from-orange-600 to-orange-500 text-white font-semibold rounded-xl shadow-lg flex items-center gap-2"
+              title="在1688批量搜索（批量采购首选）"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              {selectedItems.size > 0 ? `1688搜 (${selectedItems.size})` : '1688搜索'}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => openSelectedLinks('taobao')}
+              className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg flex items-center gap-2"
+              title="在淘宝批量搜索"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              {selectedItems.size > 0 ? `淘宝搜 (${selectedItems.size})` : '淘宝搜索'}
             </motion.button>
 
             <button
@@ -456,7 +504,7 @@ export default function ProjectDetailPage() {
         <div className="container mx-auto px-4 pb-8 max-w-6xl">
           <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-2xl border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.08)] overflow-hidden">
             {/* Table Header */}
-            <div className={`hidden md:grid gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500 ${isMock ? 'grid-cols-12' : 'grid-cols-14'}`} style={{ gridTemplateColumns: isMock ? '32px 40px 3fr 2fr 60px 3fr' : '32px 40px 3fr 2fr 60px 1fr 1fr 3fr' }}>
+            <div className={`hidden md:grid gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500 ${isMock ? 'grid-cols-12' : 'grid-cols-14'}`} style={{ gridTemplateColumns: isMock ? '32px 40px 2.5fr 2fr 60px 4fr' : '32px 40px 2.5fr 2fr 60px 1fr 1fr 4fr' }}>
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -481,7 +529,6 @@ export default function ProjectDetailPage() {
             {/* Table Body */}
             {items.map((item, index) => {
               const keyword = item.search_keyword || item.parsed_name || item.raw_input
-              const searchUrl = (apiConfigured && item.buy_url) ? item.buy_url : getTaobaoSearchUrl(keyword)
 
               return (
                 <div key={item.id}>
@@ -492,7 +539,7 @@ export default function ProjectDetailPage() {
                         ? 'bg-green-50/40 hover:bg-green-50/60'
                         : 'hover:bg-orange-50/30'
                     }`}
-                    style={{ gridTemplateColumns: isMock ? '32px 40px 3fr 2fr 60px 3fr' : '32px 40px 3fr 2fr 60px 1fr 1fr 3fr' }}
+                    style={{ gridTemplateColumns: isMock ? '32px 40px 2.5fr 2fr 60px 4fr' : '32px 40px 2.5fr 2fr 60px 1fr 1fr 4fr' }}
                   >
                     <div className="flex items-center">
                       <input
@@ -576,17 +623,40 @@ export default function ProjectDetailPage() {
                       )}
 
                       <a
-                        href={searchUrl}
+                        href={getLcscSearchUrl(keyword)}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => markVisited(item.id)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                        className={`px-2.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
                           visitedItems.has(item.id)
                             ? 'bg-green-50 text-green-600 hover:bg-green-100'
-                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                         }`}
+                        title="在立创商城搜索"
                       >
-                        {visitedItems.has(item.id) ? '已查看' : '去淘宝搜'}
+                        立创
+                      </a>
+
+                      <a
+                        href={get1688SearchUrl(keyword)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markVisited(item.id)}
+                        className="px-2.5 py-1.5 bg-orange-50 text-orange-600 text-xs font-medium rounded-lg hover:bg-orange-100 transition-all"
+                        title="在1688搜索"
+                      >
+                        1688
+                      </a>
+
+                      <a
+                        href={getTaobaoSearchUrl(keyword)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markVisited(item.id)}
+                        className="px-2.5 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
+                        title="在淘宝搜索"
+                      >
+                        淘宝
                       </a>
 
                       <button
@@ -694,17 +764,35 @@ export default function ProjectDetailPage() {
                         </button>
                       )}
                       <a
-                        href={searchUrl}
+                        href={getLcscSearchUrl(keyword)}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={() => markVisited(item.id)}
                         className={`px-3 py-2 text-xs font-medium rounded-lg transition-all ${
                           visitedItems.has(item.id)
                             ? 'bg-green-50 text-green-600 hover:bg-green-100'
-                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
                         }`}
                       >
-                        {visitedItems.has(item.id) ? '已查看' : '去淘宝搜'}
+                        立创
+                      </a>
+                      <a
+                        href={get1688SearchUrl(keyword)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markVisited(item.id)}
+                        className="px-3 py-2 bg-orange-50 text-orange-600 text-xs font-medium rounded-lg hover:bg-orange-100 transition-all"
+                      >
+                        1688
+                      </a>
+                      <a
+                        href={getTaobaoSearchUrl(keyword)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markVisited(item.id)}
+                        className="px-3 py-2 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
+                      >
+                        淘宝
                       </a>
                       {!isMock && item.search_results && item.search_results.length > 0 && (
                         <button

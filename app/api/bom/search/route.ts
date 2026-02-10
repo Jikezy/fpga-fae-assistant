@@ -6,6 +6,19 @@ import { getCachedSearch, setCachedSearch, updateItem } from '@/lib/bom-db'
 export const runtime = 'nodejs'
 
 /**
+ * GET /api/bom/search
+ * 检查淘宝 API 配置状态
+ */
+export async function GET(req: NextRequest) {
+  const authResult = await requireAuth(req)
+  if (authResult.error) return authResult.error
+
+  return NextResponse.json({
+    apiConfigured: taobaoClient.isConfigured(),
+  })
+}
+
+/**
  * POST /api/bom/search
  * 搜索淘宝商品
  */

@@ -23,10 +23,15 @@ const BOM_SYSTEM_PROMPT = `你是一个电子元器件 BOM（物料清单）解�
 你的任务是将文本解析为结构化的 JSON 数组。
 
 每个元器件需要提取：
-- name: 元器件通用名称
-- spec: 具体规格型号（如封装、阻值、容值等）
+- name: 元器件通用名称（如 STM32F103C8T6、10kΩ电阻 等）
+- spec: 具体规格型号（如封装、阻值、容值等，不要重复 name 中已有的信息）
 - quantity: 数量（默认为1）
-- searchKeyword: 适合在淘宝搜索的关键词（要具体，便于搜索到正确商品）
+- searchKeyword: 适合在淘宝/立创商城搜索的简短关键词。要求：
+  * 只保留核心型号名，去掉封装尺寸、引脚间距、焊盘参数等 EDA 信息
+  * 例如 "ML307C-DC-CN LCC-LGA-109_L17.7-W15.8" 应提取为 "ML307C-DC-CN"
+  * 例如 "10kΩ R0805" 应提取为 "10K电阻 0805"
+  * 例如 "KH-6H-TJ SW-TH_4P-L6.0-W6.0" 应提取为 "按键开关 6x6"
+  * 关键词要简短精准，去掉所有无关的封装尺寸数据
 - category: 分类（芯片/电容/电阻/电感/二极管/三极管/模块/连接器/线材/工具/其他）
 
 如果某些信息不明确，在 warnings 数组中说明。
@@ -149,11 +154,14 @@ function ruleBasedParse(text: string): ParseResult {
       category = '线材'
     }
 
+    // 清理搜索关键词：去除 EDA 封装信息
+    const searchKeyword = cleanSearchKeyword(name, category)
+
     items.push({
       name: name,
       spec: '',
       quantity,
-      searchKeyword: name,
+      searchKeyword,
       category,
     })
   }
@@ -163,4 +171,49 @@ function ruleBasedParse(text: string): ParseResult {
   }
 
   return { items, warnings, parseEngine: 'rule' }
+}
+
+/**
+ * 清理搜索关键词：去除 EDA 封装尺寸、引脚间距等无用信息
+ * 例如 "ML307C-DC-CN LCC-LGA-109_L17.7-W15.8-P1.10_MC661" → "ML307C-DC-CN"
+ * 例如 "10kΩ R0805" → "10K电阻 0805"
+ */
+function cleanSearchKeyword(rawName: string, category: string): string {
+  let keyword = rawName
+
+  // 去除常见 EDA 封装描述模式
+  // 匹配 "_Lxx.x-Wxx.x-Pxx.x" 尺寸参数
+  keyword = keyword.replace(/_?[LlWwHhPp]\d+\.?\d*[-x×][WwHhPp]?\d+\.?\d*[-x×]?[Pp]?\d*\.?\d*/g, '')
+  // 匹配 "LCC-LGA-109", "LQFP-48", "QFN-32", "SOP-8", "SOT-23" 等封装类型
+  keyword = keyword.replace(/\s+(LCC|LGA|LQFP|QFP|QFN|BGA|SOP|SSOP|TSSOP|SOT|DIP|SOIC|DFN|WLCSP|TO)-?\d*/gi, '')
+  // 匹配 "SW-TH_4P" "SMD_" 等焊接/工艺描述
+  keyword = keyword.replace(/\s*(SW-TH|SMD|TH|SMT)[-_]?\d*[Pp]?/gi, '')
+  // 匹配 "_MCxxx" 封装后缀
+  keyword = keyword.replace(/_MC\d+/g, '')
+  // 匹配 "-LS6.5" 焊盘间距后缀
+  keyword = keyword.replace(/-LS\d+\.?\d*/g, '')
+  // 去除多余的下划线和连字符
+  keyword = keyword.replace(/[_]+$/, '').replace(/\s+/g, ' ').trim()
+
+  // 如果清理后太短（<2字符），回退到原始名称的第一段
+  if (keyword.length < 2) {
+    keyword = rawName.split(/[\s_]/)[0]
+  }
+
+  // 针对电阻/电容等被动元件，生成更友好的搜索词
+  if (category === '电阻') {
+    const valMatch = keyword.match(/(\d+[kKmM]?)\s*[ΩΩ欧ohm]/i)
+    const pkgMatch = keyword.match(/[Rr]?(\d{4})/)?.[1]
+    if (valMatch) {
+      keyword = `${valMatch[1]}电阻${pkgMatch ? ' ' + pkgMatch : ''}`
+    }
+  } else if (category === '电容') {
+    const valMatch = keyword.match(/(\d+\.?\d*)\s*(uf|nf|pf|μf)/i)
+    const pkgMatch = keyword.match(/[Cc]?(\d{4})/)?.[1]
+    if (valMatch) {
+      keyword = `${valMatch[1]}${valMatch[2]}电容${pkgMatch ? ' ' + pkgMatch : ''}`
+    }
+  }
+
+  return keyword
 }
