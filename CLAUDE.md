@@ -1,11 +1,11 @@
 # CLAUDE.md
 
-本文件为 Claude Code (claude.ai/code) 在本仓库中工作时提供指导。
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## 项目概述
 
 FPGA FAE 助手 — AI 驱动的 FPGA 现场应用工程师咨询平台，包含两大核心模块：
-1. **AI 对话 + RAG** — 基于 Claude AI 的技术问答，支持 PDF 文档分析
+1. **AI 对话 + RAG** — 多后端 AI 技术问答（免费模型默认可用 + Claude 可选升级），支持 PDF 文档分析
 2. **BOM 模块** — 智能电子元器件采购系统，使用 DeepSeek AI 解析 + 淘宝商品搜索
 
 ## 技术栈
@@ -15,7 +15,8 @@ FPGA FAE 助手 — AI 驱动的 FPGA 现场应用工程师咨询平台，包含
 - **动画**: Framer Motion
 - **后端**: Next.js API Routes
 - **数据库**: PostgreSQL (Neon Serverless) + @neondatabase/serverless
-- **AI（对话）**: Anthropic Claude SDK (@anthropic-ai/sdk) — 模型: `claude-opus-4-20250514`
+- **AI（对话 — 免费）**: SiliconFlow API（OpenAI 兼容格式，fetch 调用）— 模型: `deepseek-ai/DeepSeek-V3`, `Qwen/Qwen2.5-72B-Instruct`
+- **AI（对话 — 高级）**: Anthropic Claude SDK (@anthropic-ai/sdk) — 模型: `claude-opus-4-20250514`（需用户配置 API Key）
 - **AI（BOM 解析）**: DeepSeek API — 模型: `deepseek-chat`（免费，无需用户 API Key）
 - **PDF 处理**: unpdf
 - **Excel/CSV 处理**: xlsx
@@ -73,7 +74,7 @@ app/
 └── page.tsx           # 根路由重定向
 
 lib/
-├── ai-service.ts          # Anthropic Claude API 封装（流式输出）
+├── ai-service.ts          # 多后端 AI 服务（Anthropic Claude + SiliconFlow OpenAI 兼容）
 ├── simpleVectorStore.ts   # PostgreSQL 向量存储（TF-IDF + Jaccard）
 ├── pdfProcessor.ts        # PDF 文本提取与分块
 ├── auth.ts                # 会话管理工具
@@ -160,7 +161,7 @@ lib/
 
 **用户角色**:
 - `admin`: 可使用系统默认 ANTHROPIC_API_KEY
-- `user`: 必须在 `/settings` 中配置个人 API Key
+- `user`: 免费模型（SiliconFlow）无需配置即可使用；使用 Claude 需在 `/settings` 中配置个人 API Key
 
 ### 2. RAG 管线
 
@@ -168,7 +169,7 @@ lib/
 1. PDF 上传 → /api/upload → unpdf 提取文本 → 500 字符分块（100 重叠）→ 写入 documents + embeddings 表
 2. 查询 → /api/chat → simpleVectorStore.search() → TF-IDF + Jaccard 相似度 → top-k 分块（阈值: 0.005，每文档最多 3 块）
 3. 上下文注入 → 拼接到用户消息前: 【参考文档】...【用户问题】...
-4. AI 响应 → Anthropic Claude 流式输出 → SSE → 前端实时渲染
+4. AI 响应 → 根据所选 provider 流式输出（Anthropic SDK 或 fetch OpenAI 格式）→ SSE → 前端实时渲染
 ```
 
 **关键模式**（Anthropic 专用）:
@@ -182,15 +183,28 @@ const messages = [{ role: 'system', content: ragContext }, { role: 'user', conte
 
 Anthropic 的 `system` 参数与 `messages` 是分离的。系统提示词通过 `lib/ai-service.ts` 中的 `system` 参数单独传递。
 
-### 3. AI 服务配置
+### 3. AI 服务配置（多后端）
 
-**API Key 优先级**:
-1. 用户个人 Key（数据库中的 `user.anthropic_api_key`）
-2. 系统默认 Key（`process.env.ANTHROPIC_API_KEY`）
+**双后端架构** (`lib/ai-service.ts`):
+- `provider: 'siliconflow'` — 免费模型，用 `fetch` 调 OpenAI 兼容 SSE 流，任何登录用户可用
+- `provider: 'anthropic'` — Claude 高级模型，用 Anthropic SDK，需用户或系统 API Key
+
+**模型 ID 格式**（前端 ↔ 后端约定）:
+```
+{provider}-{modelName}
+```
+示例: `siliconflow-deepseek-ai/DeepSeek-V3`, `anthropic-claude-opus-4-6`
+前端用首个 `-` 分割: `provider = id.substring(0, dashIndex)`, `model = id.substring(dashIndex + 1)`
+
+**API Key 路由逻辑** (`app/api/chat/route.ts`):
+- `siliconflow` → 使用系统 `SILICONFLOW_API_KEY`，任何登录用户可用
+- `anthropic` → 优先用户个人 Key → admin 可 fallback 到系统 `ANTHROPIC_API_KEY`
+
+**PDF 分析降级**: `full-read` 和 `full-read-by-name` 接口在无 Claude key 时自动降级到 SiliconFlow 免费模型
 
 **API 端点**:
-- Base URL: `https://yunwu.ai`（云雾 AI 代理，非 Anthropic 官方 API）
-- 模型: `claude-opus-4-20250514`
+- SiliconFlow Base URL: `https://api.siliconflow.cn/v1`
+- Anthropic Base URL: `https://yunwu.ai`（云雾 AI 代理，非 Anthropic 官方 API）
 - 流式输出: 始终通过 SSE 启用
 
 ### 4. BOM 模块工作流
@@ -245,8 +259,10 @@ Anthropic 的 `system` 参数与 `messages` 是分离的。系统提示词通过
 ## 环境变量
 
 ```bash
-# AI 服务 — 对话（Anthropic Claude）
-AI_PROVIDER=anthropic
+# AI 服务 — 对话免费模型（SiliconFlow）
+SILICONFLOW_API_KEY=sk-xxx...  # 硅基流动 API Key，免费模型必需
+
+# AI 服务 — 对话高级模型（Anthropic Claude，可选）
 ANTHROPIC_API_KEY=sk-xxx...
 ANTHROPIC_BASE_URL=https://yunwu.ai  # 必须: 使用云雾 AI 代理，非官方 API
 
@@ -267,6 +283,7 @@ NEXT_PUBLIC_MAX_FILE_SIZE=10485760  # 10MB
 ```
 
 **关键注意事项**:
+- `SILICONFLOW_API_KEY` 是免费模型运行的必要条件
 - `ANTHROPIC_BASE_URL` **必须**设置为 `https://yunwu.ai`（不是 Anthropic 官方 API）
 - 生产环境变量在 Spaceship 控制台配置（不来自 `.env` 文件）
 - DeepSeek 是免费的，仅用于 BOM 文本解析 — 与对话 AI 分离
