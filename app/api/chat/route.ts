@@ -35,33 +35,49 @@ export async function POST(req: NextRequest) {
 
     const user = userConfig[0] as any
 
-    // 只支持 Anthropic provider
+    // 根据 provider 决定 API key 来源
+    const aiProvider: 'anthropic' | 'siliconflow' = provider || 'anthropic'
     let apiKey: string | undefined
     let baseURL: string | undefined
 
-    // 优先使用用户配置，管理员可使用系统默认
-    if (user.role !== 'admin' && !user.anthropic_api_key) {
-      return new Response(
-        JSON.stringify({
-          error: 'API配置缺失',
-          message: '请先配置您的 Anthropic API Key',
-          needsConfig: true,
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
+    if (aiProvider === 'siliconflow') {
+      // 免费模型：使用系统 SiliconFlow API Key，任何登录用户可用
+      apiKey = process.env.SILICONFLOW_API_KEY
+      baseURL = 'https://api.siliconflow.cn/v1'
+      if (!apiKey) {
+        return new Response(
+          JSON.stringify({
+            error: '免费模型暂不可用',
+            message: '系统未配置 SiliconFlow API Key，请联系管理员或切换到 Claude 模型',
+          }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    } else {
+      // Claude 模型：需要用户自己的 key 或 admin 系统 key
+      if (user.role !== 'admin' && !user.anthropic_api_key) {
+        return new Response(
+          JSON.stringify({
+            error: 'API配置缺失',
+            message: '使用 Claude 模型需要配置 API Key，请在设置中配置，或切换到免费模型',
+            needsConfig: true,
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
 
-    apiKey = user.anthropic_api_key
-    baseURL = user.anthropic_base_url || 'https://yunwu.ai'
+      apiKey = user.anthropic_api_key
+      baseURL = user.anthropic_base_url || 'https://yunwu.ai'
 
-    if (user.role === 'admin' && !apiKey) {
-      apiKey = process.env.ANTHROPIC_API_KEY
-      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
+      if (user.role === 'admin' && !apiKey) {
+        apiKey = process.env.ANTHROPIC_API_KEY
+        baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
+      }
     }
 
     // 创建 AI 服务实例
     const aiService = new AIService({
-      provider: provider || 'anthropic',
+      provider: aiProvider,
       model,
       apiKey,
       baseURL,
@@ -74,7 +90,9 @@ export async function POST(req: NextRequest) {
         JSON.stringify({
           error: 'AI服务不可用',
           message: health.message,
-          suggestion: '请检查 Anthropic API Key 配置是否正确'
+          suggestion: aiProvider === 'siliconflow'
+            ? '免费模型暂时不可用，请稍后重试或切换到 Claude 模型'
+            : '请检查 API Key 配置是否正确，或切换到免费模型'
         }),
         { status: 503, headers: { 'Content-Type': 'application/json' } }
       )
@@ -221,7 +239,7 @@ ${fileList}
         } catch (error) {
           console.error('AI服务错误:', error)
           const errorData = JSON.stringify({
-            content: `抱歉，AI服务出现错误：${error instanceof Error ? error.message : '未知错误'}。\n\n请检查：\n1. 确保 Anthropic API Key 正确\n2. 检查网络连接\n3. 确认 API 配额是否充足`,
+            content: `抱歉，AI服务出现错误：${error instanceof Error ? error.message : '未知错误'}。\n\n请检查：\n1. 如果使用免费模型，请稍后重试\n2. 如果使用 Claude，请确认 API Key 配置正确\n3. 检查网络连接`,
           })
           controller.enqueue(encoder.encode(`data: ${errorData}\n\n`))
           controller.close()

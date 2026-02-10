@@ -9,7 +9,7 @@ import PageTransition from '@/components/PageTransition'
 
 export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [currentModel, setCurrentModel] = useState('anthropic-claude-opus-4-6')
+  const [currentModel, setCurrentModel] = useState('siliconflow-deepseek-ai/DeepSeek-V3')
   const [fullReadRequest, setFullReadRequest] = useState<string | null>(null)
 
   return (

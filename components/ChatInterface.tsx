@@ -20,8 +20,12 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ currentModel, fullReadRequest, onFullReadComplete }: ChatInterfaceProps) {
   // 获取模型友好名称
   const getModelDisplayName = (modelId: string) => {
-    if (modelId === 'anthropic-claude-opus-4-6') return 'Claude Opus 4.6'
-    return modelId
+    const names: Record<string, string> = {
+      'anthropic-claude-opus-4-6': 'Claude Opus 4.6',
+      'siliconflow-deepseek-ai/DeepSeek-V3': 'DeepSeek V3（免费）',
+      'siliconflow-Qwen/Qwen2.5-72B-Instruct': 'Qwen 2.5 72B（免费）',
+    }
+    return names[modelId] || modelId
   }
 
   const [messages, setMessages] = useState<Message[]>([
@@ -208,7 +212,7 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: `抱歉，完整阅读失败。\n\n错误详情：${errorMessage}\n\n💡 提示：如果提示缺少API配置，请前往设置页面配置您的云雾AI API Key。`,
+          content: `抱歉，完整阅读失败。\n\n错误详情：${errorMessage}\n\n💡 提示：完整阅读功能会自动选择可用的AI模型。如果持续失败，请稍后重试。`,
           timestamp: new Date(),
         },
       ])
@@ -234,9 +238,10 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
 
     try {
       // 解析模型 ID 获取 provider 和 model
-      // 格式: provider-modelName (例如: anthropic-claude-opus-4-6)
-      const [provider, ...modelParts] = currentModel.split('-')
-      const modelName = modelParts.join('-')
+      // 格式: provider-modelName (例如: siliconflow-deepseek-ai/DeepSeek-V3)
+      const dashIndex = currentModel.indexOf('-')
+      const provider = currentModel.substring(0, dashIndex)
+      const modelName = currentModel.substring(dashIndex + 1)
 
       // 调用API
       const response = await fetch('/api/chat', {
@@ -319,12 +324,15 @@ export default function ChatInterface({ currentModel, fullReadRequest, onFullRea
 
       // 显示具体的错误信息
       const errorMessage = error instanceof Error ? error.message : '未知错误'
+      const isFreeModel = currentModel.startsWith('siliconflow-')
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: `抱歉，发生了错误。\n\n错误详情：${errorMessage}\n\n💡 提示：如果提示缺少API配置，请前往设置页面配置您的云雾AI API Key。`,
+          content: isFreeModel
+            ? `抱歉，发生了错误。\n\n错误详情：${errorMessage}\n\n💡 提示：免费模型可能暂时繁忙，请稍后重试。`
+            : `抱歉，发生了错误。\n\n错误详情：${errorMessage}\n\n💡 提示：如果提示缺少API配置，请前往设置页面配置您的云雾AI API Key，或切换到免费模型。`,
           timestamp: new Date(),
         },
       ])

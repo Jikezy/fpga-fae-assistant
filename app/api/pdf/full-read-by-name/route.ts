@@ -43,22 +43,29 @@ export async function POST(req: NextRequest) {
 
     const user = userConfig[0] as any
 
-    // 如果是普通用户且未配置API Key，返回错误
-    if (user.role !== 'admin' && !user.anthropic_api_key) {
-      return NextResponse.json({
-        error: 'API配置缺失',
-        message: '请先在设置中配置您的云雾AI API Key',
-        needsConfig: true,
-      }, { status: 403 })
-    }
-
-    // 决定使用哪个API Key和Base URL
+    // 决定使用哪个 AI 服务
+    let useProvider: 'anthropic' | 'siliconflow' = 'anthropic'
     let apiKey = user.anthropic_api_key
     let baseURL = user.anthropic_base_url || 'https://yunwu.ai'
 
     if (user.role === 'admin' && !apiKey) {
       apiKey = process.env.ANTHROPIC_API_KEY
       baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
+    }
+
+    // 无 Claude key 时降级到 SiliconFlow 免费模型
+    if (!apiKey) {
+      if (process.env.SILICONFLOW_API_KEY) {
+        useProvider = 'siliconflow'
+        apiKey = process.env.SILICONFLOW_API_KEY
+        baseURL = 'https://api.siliconflow.cn/v1'
+      } else {
+        return NextResponse.json({
+          error: 'AI服务不可用',
+          message: '请在设置中配置 Claude API Key，或联系管理员启用免费模型',
+          needsConfig: true,
+        }, { status: 403 })
+      }
     }
 
     // 从数据库获取该文件的所有文档片段（仅当前用户的）
@@ -93,11 +100,11 @@ export async function POST(req: NextRequest) {
     const outputCost = (estimatedOutputTokens / 1000000) * 90 // ¥90/百万tokens
     const totalCost = inputCost + outputCost
 
-    // 调用AI服务（使用最好的 Claude Opus 4.6 进行完整阅读）
+    // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
     const aiService = new AIService({
-      provider: 'anthropic',
-      model: 'claude-opus-4-6',
+      provider: useProvider,
+      model: useProvider === 'siliconflow' ? 'deepseek-ai/DeepSeek-V3' : 'claude-opus-4-6',
       apiKey,
       baseURL,
     })

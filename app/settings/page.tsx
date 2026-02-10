@@ -48,7 +48,6 @@ export default function SettingsPage() {
       setLoading(false)
     }
   }
-
   const handleSave = async () => {
     if (!apiKey.trim()) {
       setMessage({ type: 'error', text: 'API Key 不能为空' })
@@ -85,7 +84,7 @@ export default function SettingsPage() {
   }
 
   const handleDelete = async () => {
-    if (!confirm('确定要删除API配置吗？删除后将无法使用AI功能。')) {
+    if (!confirm('确定要删除 Claude API 配置吗？免费模型不受影响，您仍可正常使用。')) {
       return
     }
 
@@ -95,7 +94,7 @@ export default function SettingsPage() {
       })
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'API配置已删除' })
+        setMessage({ type: 'success', text: 'Claude API 配置已删除' })
         setHasApiKey(false)
         setApiKey('')
       }
@@ -111,7 +110,6 @@ export default function SettingsPage() {
       </div>
     )
   }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden">
       {/* 水墨背景效果 */}
@@ -138,6 +136,18 @@ export default function SettingsPage() {
       {/* 主内容 */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="bg-gray-900/40 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 space-y-6 border border-gray-600/30">
+          {/* 免费模型提示 */}
+          <div className="bg-green-900/30 backdrop-blur-sm border border-green-700/40 rounded-2xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-3 h-3 rounded-full bg-green-400 shadow-lg shadow-green-400/50 mt-1 flex-shrink-0"></div>
+              <div>
+                <h3 className="text-sm font-semibold text-green-300">免费模型已就绪</h3>
+                <p className="text-sm text-gray-200 mt-1">
+                  DeepSeek V3、Qwen 2.5 72B 等免费模型无需任何配置，注册即可使用。以下 Claude 配置为可选升级。
+                </p>
+              </div>
+            </div>
+          </div>
           {/* 管理员提示 */}
           {currentUser?.role === 'admin' && (
             <div className="bg-yellow-900/30 backdrop-blur-sm border border-yellow-700/40 rounded-2xl p-4">
@@ -169,26 +179,27 @@ export default function SettingsPage() {
           {/* 当前状态 */}
           <div>
             <h2 className="text-lg font-semibold text-gray-100 mb-4">当前状态</h2>
-            <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${hasApiKey ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-600'}`}></div>
-              <span className="text-sm text-gray-100">
-                {hasApiKey ? '✅ 已配置 API Key' : '❌ 未配置 API Key'}
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-green-400 shadow-lg shadow-green-400/50"></div>
+                <span className="text-sm text-gray-100">免费模型（DeepSeek V3 / Qwen 2.5）— 始终可用</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${hasApiKey ? 'bg-green-400 shadow-lg shadow-green-400/50' : 'bg-gray-600'}`}></div>
+                <span className="text-sm text-gray-100">
+                  Claude Opus 4.6 — {hasApiKey ? '已配置 API Key' : '未配置（可选）'}
+                </span>
+              </div>
             </div>
-            {!hasApiKey && currentUser?.role !== 'admin' && (
-              <p className="text-sm text-red-400 mt-2">
-                ⚠️ 您需要配置自己的云雾AI API Key 才能使用AI功能
-              </p>
-            )}
           </div>
 
-          {/* API Key 配置 */}
+          {/* Claude API Key 配置 */}
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-100">云雾AI 配置</h2>
+            <h2 className="text-lg font-semibold text-gray-100">Claude API 配置（可选）</h2>
 
             <div>
               <label className="block text-sm font-medium text-gray-100 mb-2">
-                API Key *
+                API Key
               </label>
               <input
                 type="password"
@@ -225,7 +236,7 @@ export default function SettingsPage() {
               disabled={saving}
               className="flex-1 bg-gradient-to-r from-gray-700 to-gray-900 text-gray-100 py-3 px-4 rounded-2xl hover:shadow-2xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-xl ring-1 ring-gray-500/50"
             >
-              {saving ? '保存中...' : '保存配置'}
+              {saving ? '保存中...' : '保存 Claude 配置'}
             </button>
             {hasApiKey && (
               <button
@@ -239,12 +250,12 @@ export default function SettingsPage() {
 
           {/* 说明 */}
           <div className="bg-blue-900/30 backdrop-blur-sm border border-blue-700/40 rounded-2xl p-4">
-            <h3 className="text-sm font-semibold text-gray-100 mb-2">💡 使用说明</h3>
+            <h3 className="text-sm font-semibold text-gray-100 mb-2">使用说明</h3>
             <ul className="text-xs text-gray-200 space-y-1">
-              <li>• 配置后将使用您自己的云雾AI账户进行调用</li>
-              <li>• API 费用由您的云雾AI账户承担</li>
-              <li>• 管理员可选择性配置（使用系统默认配置或个人配置）</li>
-              <li>• 普通用户必须配置才能使用AI功能</li>
+              <li>• 免费模型（DeepSeek V3、Qwen 2.5 72B）无需配置，注册即用</li>
+              <li>• 配置 Claude API Key 后可在模型选择器中切换到 Claude Opus 4.6</li>
+              <li>• Claude 费用由您的云雾AI账户承担</li>
+              <li>• 管理员可使用系统默认 Claude 配置</li>
               <li>• API Key 加密存储，仅您可见</li>
             </ul>
           </div>

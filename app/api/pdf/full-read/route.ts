@@ -57,15 +57,52 @@ export async function POST(req: NextRequest) {
     const outputCost = (estimatedOutputTokens / 1000000) * 90 // ¥90/百万tokens
     const totalCost = inputCost + outputCost
 
-    // 转换PDF为base64
-    const bytes = await file.arrayBuffer()
-    const base64 = Buffer.from(bytes).toString('base64')
+    // 获取用户的API配置
+    const { getSql } = await import('@/lib/db-schema')
+    const sql = getSql()
+    const userConfig = await sql`
+      SELECT anthropic_api_key, anthropic_base_url, role
+      FROM users
+      WHERE id = ${authResult.user.id}
+    `
 
-    // 调用Claude API（使用PDF文档分析功能）
+    const user = userConfig.length > 0 ? (userConfig[0] as any) : null
+
+    // 决定使用哪个 AI 服务
+    let useProvider: 'anthropic' | 'siliconflow' = 'anthropic'
+    let apiKey = user?.anthropic_api_key
+    let baseURL = user?.anthropic_base_url || 'https://yunwu.ai'
+
+    if (user?.role === 'admin' && !apiKey) {
+      apiKey = process.env.ANTHROPIC_API_KEY
+      baseURL = process.env.ANTHROPIC_BASE_URL || 'https://yunwu.ai'
+    }
+
+    // 无 Claude key 时降级到 SiliconFlow 免费模型
+    if (!apiKey) {
+      if (process.env.SILICONFLOW_API_KEY) {
+        useProvider = 'siliconflow'
+        apiKey = process.env.SILICONFLOW_API_KEY
+        baseURL = 'https://api.siliconflow.cn/v1'
+      } else {
+        return NextResponse.json({
+          error: 'AI服务不可用',
+          message: '请在设置中配置 Claude API Key，或联系管理员启用免费模型',
+          needsConfig: true,
+        }, { status: 403 })
+      }
+    }
+
+    // 读取PDF文件内容
+    const bytes = await file.arrayBuffer()
+
+    // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
     const aiService = new AIService({
-      provider: 'anthropic',
-      model: 'claude-opus-4-6',
+      provider: useProvider,
+      model: useProvider === 'siliconflow' ? 'deepseek-ai/DeepSeek-V3' : 'claude-opus-4-6',
+      apiKey,
+      baseURL,
     })
 
     // 创建流式响应
