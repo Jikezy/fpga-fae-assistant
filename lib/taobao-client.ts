@@ -37,6 +37,7 @@ class TaobaoClient {
   private appSecret: string
   private pid: string
   private isMock: boolean
+  public lastError: string = ''
 
   constructor() {
     this.appKey = process.env.TAOBAO_APP_KEY || ''
@@ -120,6 +121,7 @@ class TaobaoClient {
         platform: item.user_type === 1 ? 'tmall' : 'taobao',
       }))
     } catch (error) {
+      this.lastError = error instanceof Error ? error.message : String(error)
       console.error('淘宝 API 调用失败，降级到 mock:', error)
       return this.mockSearch(params.keyword)
     }
