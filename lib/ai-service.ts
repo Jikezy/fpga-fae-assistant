@@ -1,6 +1,6 @@
 /**
  * AI 服务抽象层
- * BYOK（自带 Key）— 统一使用 OpenAI 兼容格式调用
+ * BYOK（自带 Key）— 自动检测 OpenAI / Anthropic 格式
  */
 
 // AI 消息接口
@@ -19,8 +19,11 @@ export interface AIServiceConfig {
 // 流式响应回调
 export type StreamCallback = (chunk: string) => void
 
+// 30 秒超时
+const FETCH_TIMEOUT = 30000
+
 /**
- * AI 服务类（OpenAI 兼容格式）
+ * AI 服务类（自动检测 OpenAI / Anthropic 格式）
  */
 export class AIService {
   private config: AIServiceConfig
@@ -44,17 +47,43 @@ export class AIService {
   }
 
   /**
+   * 判断是否为 Anthropic 格式的模型名称
+   */
+  private isAnthropicModel(): boolean {
+    const model = this.config.model.toLowerCase()
+    return model.includes('claude')
+  }
+
+  /**
+   * 带超时的 fetch
+   */
+  private async fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT)
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      })
+      return response
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`AI API 请求超时（${FETCH_TIMEOUT / 1000}秒），请检查 Base URL 是否正确`)
+      }
+      throw error
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  /**
    * 流式聊天（OpenAI 兼容格式）
    */
-  async streamChat(
+  private async streamChatOpenAI(
     messages: AIMessage[],
     onChunk: StreamCallback
   ): Promise<void> {
-    if (!this.config.apiKey) {
-      throw new Error('API Key 未配置')
-    }
-
-    const response = await fetch(`${this.config.baseURL}/chat/completions`, {
+    const response = await this.fetchWithTimeout(`${this.config.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -73,9 +102,58 @@ export class AIService {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '')
-      throw new Error(`AI API 错误 (${response.status}): ${errorText}`)
+      throw new Error(`OpenAI 格式 API 错误 (${response.status}): ${errorText}`)
     }
 
+    await this.readSSEStream(response, (data) => {
+      const content = data.choices?.[0]?.delta?.content
+      if (content) onChunk(content)
+    })
+  }
+
+  /**
+   * 流式聊天（Anthropic 格式）
+   */
+  private async streamChatAnthropic(
+    messages: AIMessage[],
+    onChunk: StreamCallback
+  ): Promise<void> {
+    const response = await this.fetchWithTimeout(`${this.config.baseURL}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.config.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        system: this.getSystemPrompt(),
+        messages: messages,
+        max_tokens: 4096,
+        stream: true,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '')
+      throw new Error(`Anthropic 格式 API 错误 (${response.status}): ${errorText}`)
+    }
+
+    await this.readSSEStream(response, (data) => {
+      // Anthropic SSE: event: content_block_delta, data: { delta: { text: "..." } }
+      if (data.type === 'content_block_delta' && data.delta?.text) {
+        onChunk(data.delta.text)
+      }
+    })
+  }
+
+  /**
+   * 通用 SSE 流读取
+   */
+  private async readSSEStream(
+    response: Response,
+    onData: (parsed: any) => void
+  ): Promise<void> {
     const reader = response.body?.getReader()
     if (!reader) throw new Error('无法读取响应流')
 
@@ -98,13 +176,44 @@ export class AIService {
 
         try {
           const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content
-          if (content) onChunk(content)
+          onData(parsed)
         } catch {
           // skip malformed JSON lines
         }
       }
     }
+  }
+
+  /**
+   * 流式聊天（自动检测格式）
+   * Claude 模型：先试 OpenAI 兼容格式，失败则试 Anthropic 原生格式
+   * 非 Claude 模型：直接用 OpenAI 格式
+   */
+  async streamChat(messages: AIMessage[], onChunk: StreamCallback): Promise<void> {
+    if (!this.config.apiKey) {
+      throw new Error('API Key 未配置')
+    }
+
+    if (this.isAnthropicModel()) {
+      try {
+        await this.streamChatOpenAI(messages, onChunk)
+        return
+      } catch (openaiError) {
+        // OpenAI 格式失败，尝试 Anthropic 原生格式
+        const msg = openaiError instanceof Error ? openaiError.message : ''
+        console.log(`OpenAI 格式失败 (${msg})，尝试 Anthropic 原生格式...`)
+        try {
+          await this.streamChatAnthropic(messages, onChunk)
+          return
+        } catch (anthropicError) {
+          // 两种格式都失败，抛出 Anthropic 格式的错误（更可能是用户的目标格式）
+          throw anthropicError
+        }
+      }
+    }
+
+    // 非 Claude 模型直接用 OpenAI 格式
+    await this.streamChatOpenAI(messages, onChunk)
   }
 
   /**
