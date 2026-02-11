@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     await ensureAiModelColumn()
     const sql = getSql()
     const result = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format
+      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format, bom_api_key, bom_base_url
       FROM users
       WHERE id = ${authResult.user.id}
     `
@@ -42,6 +42,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    let maskedBomKey = ''
+    if (user.bom_api_key) {
+      const key = user.bom_api_key
+      if (key.length > 8) {
+        maskedBomKey = key.slice(0, 4) + '····' + key.slice(-4)
+      } else {
+        maskedBomKey = '****'
+      }
+    }
+
     return NextResponse.json({
       success: true,
       hasApiKey: !!user.anthropic_api_key,
@@ -49,6 +59,9 @@ export async function GET(req: NextRequest) {
       baseUrl: user.anthropic_base_url || '',
       model: user.ai_model || '',
       apiFormat: user.api_format || 'auto',
+      hasBomKey: !!user.bom_api_key,
+      maskedBomKey,
+      bomBaseUrl: user.bom_base_url || '',
     })
   } catch (error) {
     console.error('获取API配置失败:', error)
@@ -69,7 +82,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { api_key, base_url, model_name, api_format } = await req.json()
+    const { api_key, base_url, model_name, api_format, bom_api_key, bom_base_url } = await req.json()
 
     await ensureAiModelColumn()
 
@@ -97,8 +110,8 @@ export async function POST(req: NextRequest) {
     const format = api_format || 'auto'
     const sql = getSql()
 
+    // 更新 AI 对话配置
     if (api_key === '__KEEP_EXISTING__') {
-      // 仅更新 base_url、model、api_format，保留现有 API Key
       await sql`
         UPDATE users
         SET
@@ -117,6 +130,14 @@ export async function POST(req: NextRequest) {
           api_format = ${format}
         WHERE id = ${authResult.user.id}
       `
+    }
+
+    // 更新 BOM 解析配置（如果传了）
+    if (bom_base_url !== undefined) {
+      await sql`UPDATE users SET bom_base_url = ${bom_base_url || null} WHERE id = ${authResult.user.id}`
+    }
+    if (bom_api_key !== undefined && bom_api_key !== '' && bom_api_key !== '__KEEP_EXISTING__') {
+      await sql`UPDATE users SET bom_api_key = ${bom_api_key} WHERE id = ${authResult.user.id}`
     }
 
     return NextResponse.json({
@@ -149,7 +170,9 @@ export async function DELETE(req: NextRequest) {
         anthropic_api_key = NULL,
         anthropic_base_url = NULL,
         ai_model = NULL,
-        api_format = 'auto'
+        api_format = 'auto',
+        bom_api_key = NULL,
+        bom_base_url = NULL
       WHERE id = ${authResult.user.id}
     `
 

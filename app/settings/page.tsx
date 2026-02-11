@@ -19,6 +19,10 @@ export default function SettingsPage() {
   const [baseUrl, setBaseUrl] = useState('')
   const [modelName, setModelName] = useState('')
   const [apiFormat, setApiFormat] = useState('auto')
+  const [bomApiKey, setBomApiKey] = useState('')
+  const [bomBaseUrl, setBomBaseUrl] = useState('')
+  const [hasBomKey, setHasBomKey] = useState(false)
+  const [maskedBomKey, setMaskedBomKey] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
@@ -49,6 +53,9 @@ export default function SettingsPage() {
         setBaseUrl(data.baseUrl || '')
         setModelName(data.model || '')
         setApiFormat(data.apiFormat || 'auto')
+        setHasBomKey(data.hasBomKey || false)
+        setMaskedBomKey(data.maskedBomKey || '')
+        setBomBaseUrl(data.bomBaseUrl || '')
       }
     } catch (error) {
       console.error('加载设置失败:', error)
@@ -86,6 +93,7 @@ export default function SettingsPage() {
         base_url: baseUrl,
         model_name: modelName,
         api_format: apiFormat,
+        bom_base_url: bomBaseUrl,
       }
       // 如果用户输入了新 key 则发送；否则仍需发送旧占位（后端需要非空）
       if (apiKey.trim()) {
@@ -93,6 +101,10 @@ export default function SettingsPage() {
       } else {
         // 已有 key，发送占位让后端保留
         body.api_key = '__KEEP_EXISTING__'
+      }
+      // BOM Key
+      if (bomApiKey.trim()) {
+        body.bom_api_key = bomApiKey
       }
 
       const response = await fetch('/api/user/settings', {
@@ -136,6 +148,10 @@ export default function SettingsPage() {
         setBaseUrl('')
         setModelName('')
         setApiFormat('auto')
+        setBomApiKey('')
+        setBomBaseUrl('')
+        setHasBomKey(false)
+        setMaskedBomKey('')
       }
     } catch (error) {
       setMessage({ type: 'error', text: '删除失败' })
@@ -296,6 +312,46 @@ export default function SettingsPage() {
               <p className="mt-1 text-xs text-gray-400">
                 大多数中转站和第三方平台使用 OpenAI 格式；Anthropic 官方 API 使用原生格式。选错会导致请求失败。
               </p>
+            </div>
+          </div>
+
+          {/* BOM 解析配置 */}
+          <div className="space-y-4 border-t border-gray-600/30 pt-6">
+            <h2 className="text-lg font-semibold text-gray-100">BOM 解析配置（DeepSeek）</h2>
+            <p className="text-xs text-gray-400">
+              BOM 元器件解析使用 DeepSeek API。不配置则使用系统默认接口，配置后优先用你自己的。
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-100 mb-2">
+                DeepSeek Base URL
+              </label>
+              <input
+                type="text"
+                value={bomBaseUrl}
+                onChange={(e) => setBomBaseUrl(e.target.value)}
+                placeholder="留空使用默认 https://api.deepseek.com"
+                className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100 placeholder-gray-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-100 mb-2">
+                DeepSeek API Key
+              </label>
+              {hasBomKey && maskedBomKey && (
+                <div className="mb-2 px-4 py-2 bg-gray-700/30 border border-gray-600/30 rounded-xl flex items-center gap-2">
+                  <span className="text-xs text-gray-400">当前 Key：</span>
+                  <code className="text-sm text-green-300 font-mono">{maskedBomKey}</code>
+                </div>
+              )}
+              <input
+                type="password"
+                value={bomApiKey}
+                onChange={(e) => setBomApiKey(e.target.value)}
+                placeholder={hasBomKey ? '留空保持不变，输入新 Key 则覆盖' : '留空使用系统默认'}
+                className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100 placeholder-gray-400"
+              />
             </div>
           </div>
 

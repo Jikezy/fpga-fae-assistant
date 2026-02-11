@@ -21,8 +21,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '请输入 BOM 清单内容' }, { status: 400 })
     }
 
-    // AI 解析 BOM（走 DeepSeek，不需要用户 API key）
-    const parseResult = await parseBomText(text.trim())
+    // 读取用户的 BOM 解析配置
+    const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
+    await ensureAiModelColumn()
+    const sql = getSql()
+    const userRows = await sql`SELECT bom_api_key, bom_base_url FROM users WHERE id = ${authResult.user.id}`
+    const bomConfig = userRows.length > 0 ? { apiKey: (userRows[0] as any).bom_api_key, baseUrl: (userRows[0] as any).bom_base_url } : undefined
+
+    // AI 解析 BOM
+    const parseResult = await parseBomText(text.trim(), bomConfig)
 
     if (parseResult.items.length === 0) {
       return NextResponse.json({

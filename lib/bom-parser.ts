@@ -41,19 +41,20 @@ const BOM_SYSTEM_PROMPT = `你是一个电子元器件 BOM（物料清单）解�
 
 /**
  * 使用 DeepSeek AI 解析 BOM 文本
- * 优先走 DeepSeek（免费），失败降级到规则解析
+ * 优先用用户自己的 DeepSeek 配置，回退到系统环境变量，最后降级规则解析
  */
-export async function parseBomText(text: string): Promise<ParseResult> {
-  const apiKey = process.env.DEEPSEEK_API_KEY
+export async function parseBomText(text: string, userConfig?: { apiKey?: string; baseUrl?: string }): Promise<ParseResult> {
+  const apiKey = userConfig?.apiKey || process.env.DEEPSEEK_API_KEY
+  const baseUrl = userConfig?.baseUrl || 'https://api.deepseek.com'
 
   if (!apiKey) {
-    console.warn('DEEPSEEK_API_KEY 未配置，使用规则解析')
+    console.warn('DeepSeek API Key 未配置（用户未配置且系统环境变量也为空），使用规则解析')
     const result = ruleBasedParse(text)
     return { ...result, parseEngine: 'rule' }
   }
 
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

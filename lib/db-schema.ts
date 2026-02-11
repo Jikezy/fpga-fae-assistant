@@ -164,6 +164,14 @@ export async function initializeDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS api_format TEXT DEFAULT 'auto'
     `
 
+    // 添加 BOM 解析 DeepSeek 配置列
+    await sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_api_key TEXT
+    `
+    await sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_base_url TEXT
+    `
+
     console.log('数据库表初始化成功（含BOM模块）')
     return { success: true }
   } catch (error) {
@@ -194,6 +202,8 @@ export async function ensureAiModelColumn() {
     const sql = getSql()
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model TEXT`
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS api_format TEXT DEFAULT 'auto'`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_api_key TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_base_url TEXT`
     _aiModelMigrated = true
   } catch (e) {
     console.error('ai_model/api_format 列迁移失败:', e)
