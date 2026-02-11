@@ -47,14 +47,6 @@ export class AIService {
   }
 
   /**
-   * 判断是否为 Anthropic 格式的模型名称
-   */
-  private isAnthropicModel(): boolean {
-    const model = this.config.model.toLowerCase()
-    return model.includes('claude')
-  }
-
-  /**
    * 带超时的 fetch
    */
   private async fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
@@ -189,34 +181,25 @@ export class AIService {
 
   /**
    * 流式聊天（自动检测格式）
-   * Claude 模型：先试 OpenAI 兼容格式，失败则试 Anthropic 原生格式
-   * 非 Claude 模型：直接用 OpenAI 格式
+   * 先试 OpenAI 兼容格式，失败则试 Anthropic 原生格式
+   * 不依赖模型名判断，任何模型都会自动回退
    */
   async streamChat(messages: AIMessage[], onChunk: StreamCallback): Promise<void> {
     if (!this.config.apiKey) {
       throw new Error('API Key 未配置')
     }
 
-    if (this.isAnthropicModel()) {
-      try {
-        await this.streamChatOpenAI(messages, onChunk)
-        return
-      } catch (openaiError) {
-        // OpenAI 格式失败，尝试 Anthropic 原生格式
-        const msg = openaiError instanceof Error ? openaiError.message : ''
-        console.log(`OpenAI 格式失败 (${msg})，尝试 Anthropic 原生格式...`)
-        try {
-          await this.streamChatAnthropic(messages, onChunk)
-          return
-        } catch (anthropicError) {
-          // 两种格式都失败，抛出 Anthropic 格式的错误（更可能是用户的目标格式）
-          throw anthropicError
-        }
-      }
+    // 先试 OpenAI 格式
+    try {
+      await this.streamChatOpenAI(messages, onChunk)
+      return
+    } catch (openaiError) {
+      const msg = openaiError instanceof Error ? openaiError.message : ''
+      console.log(`OpenAI 格式失败 (${msg})，尝试 Anthropic 原生格式...`)
     }
 
-    // 非 Claude 模型直接用 OpenAI 格式
-    await this.streamChatOpenAI(messages, onChunk)
+    // OpenAI 失败，尝试 Anthropic 原生格式
+    await this.streamChatAnthropic(messages, onChunk)
   }
 
   /**
