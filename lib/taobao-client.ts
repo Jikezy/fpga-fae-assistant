@@ -102,6 +102,10 @@ class TaobaoClient {
         has_coupon: params.hasCoupon ? 'true' : 'false',
       })
 
+      // 记录原始响应用于排查
+      this.lastError = JSON.stringify(result).substring(0, 500)
+      console.log('淘宝 API 原始响应:', JSON.stringify(result).substring(0, 500))
+
       const items = result?.tbk_dg_material_optional_response?.result_list?.map_data || []
 
       return items.map((item: any) => ({
