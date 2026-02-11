@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server'
 import { AIService } from '@/lib/ai-service'
 import { getVectorStore } from '@/lib/simpleVectorStore'
 import { requireAuth } from '@/lib/auth-middleware'
-import { getUserAIConfig } from '@/lib/get-user-ai-config'
 
 // 使用 Node.js runtime
 export const runtime = 'nodejs'
@@ -18,15 +17,34 @@ export async function POST(req: NextRequest) {
   try {
     const { messages } = await req.json()
 
-    // 获取用户的AI配置（优先新供应商系统，回退旧配置）
-    const config = await getUserAIConfig(authResult.user.id)
+    // 获取用户的AI配置
+    const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
+    await ensureAiModelColumn()
+    const sql = getSql()
+    const userConfig = await sql`
+      SELECT anthropic_api_key, anthropic_base_url, ai_model
+      FROM users
+      WHERE id = ${authResult.user.id}
+    `
 
-    // BYOK：未配置则 403
-    if (!config) {
+    if (userConfig.length === 0) {
+      return new Response(
+        JSON.stringify({ error: '用户不存在' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const user = userConfig[0] as any
+    const apiKey = user.anthropic_api_key
+    const baseURL = user.anthropic_base_url
+    const model = user.ai_model
+
+    // BYOK：三者任一为空则 403
+    if (!apiKey || !baseURL || !model) {
       return new Response(
         JSON.stringify({
           error: 'AI 未配置',
-          message: '请先在 AI 服务管理页面配置供应商（Base URL、API Key、模型名称）',
+          message: '请先在设置页面配置 AI 服务（Base URL、API Key、模型名称）',
           needsConfig: true,
         }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
@@ -34,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 创建 AI 服务实例
-    const aiService = new AIService(config)
+    const aiService = new AIService({ apiKey, baseURL, model })
 
     // RAG: 检索相关文档
     let enhancedMessages = [...messages]

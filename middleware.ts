@@ -8,11 +8,6 @@ export function middleware(request: NextRequest) {
   // 公开路径（不需要登录）
   const publicPaths = ['/login', '/register', '/landing', '/api/auth/login', '/api/auth/register']
 
-  // 代理端点用自己的 Bearer token 认证，跳过 session 检查
-  if (pathname.startsWith('/api/proxy/v1/')) {
-    return NextResponse.next()
-  }
-
   // 如果是公开路径，直接放行
   if (publicPaths.some(path => pathname.startsWith(path))) {
     // 如果已登录用户访问登录/注册页，重定向到聊天页面
