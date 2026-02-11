@@ -113,6 +113,7 @@ export class AIService {
 
   /**
    * 流式聊天（Anthropic 格式）
+   * 同时发送 Authorization: Bearer 和 x-api-key，兼容官方 API 和代理服务
    */
   private async streamChatAnthropic(
     messages: AIMessage[],
@@ -122,8 +123,10 @@ export class AIService {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.config.apiKey}`,
         'x-api-key': this.config.apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'claude-code-20250219',
       },
       body: JSON.stringify({
         model: this.config.model,
