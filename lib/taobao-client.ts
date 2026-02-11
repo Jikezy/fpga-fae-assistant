@@ -93,20 +93,47 @@ class TaobaoClient {
     }
 
     try {
-      const result = await this.callApi('taobao.tbk.dg.material.optional', {
-        adzone_id: this.pid.split('_').pop() || '',
-        q: params.keyword,
-        sort: params.sort || 'total_sales_des',
-        page_size: String(params.pageSize || 20),
-        page_no: String(params.pageNo || 1),
-        has_coupon: params.hasCoupon ? 'true' : 'false',
-      })
+      // 尝试多个 API，按权限依次降级
+      let result: any = null
+      let items: any[] = []
+      let apiUsed = ''
+
+      // 方案1: taobao.tbk.dg.optimus.material（权限包 16189 公用物料）
+      try {
+        result = await this.callApi('taobao.tbk.dg.optimus.material', {
+          adzone_id: this.pid.split('_').pop() || '',
+          page_size: String(params.pageSize || 20),
+          page_no: String(params.pageNo || 1),
+          material_id: '13366', // 好券直播-全部商品
+          q: params.keyword,
+        })
+        items = result?.tbk_dg_optimus_material_response?.result_list?.map_data || []
+        apiUsed = 'optimus'
+      } catch (e) {
+        console.log('optimus API 失败，尝试 material.optional...')
+      }
+
+      // 方案2: taobao.tbk.dg.material.optional（权限包 27939）
+      if (items.length === 0) {
+        try {
+          result = await this.callApi('taobao.tbk.dg.material.optional', {
+            adzone_id: this.pid.split('_').pop() || '',
+            q: params.keyword,
+            sort: params.sort || 'total_sales_des',
+            page_size: String(params.pageSize || 20),
+            page_no: String(params.pageNo || 1),
+            has_coupon: params.hasCoupon ? 'true' : 'false',
+          })
+          items = result?.tbk_dg_material_optional_response?.result_list?.map_data || []
+          apiUsed = 'optional'
+        } catch (e) {
+          console.log('material.optional API 也失败')
+        }
+      }
 
       // 记录原始响应用于排查
-      this.lastError = JSON.stringify(result).substring(0, 500)
-      console.log('淘宝 API 原始响应:', JSON.stringify(result).substring(0, 500))
-
-      const items = result?.tbk_dg_material_optional_response?.result_list?.map_data || []
+      this.lastError = `[${apiUsed}] ${JSON.stringify(result).substring(0, 500)}`
+      console.log(`淘宝 API [${apiUsed}] 原始响应:`, JSON.stringify(result).substring(0, 500))
 
       return items.map((item: any) => ({
         itemId: item.item_id || item.num_iid,
@@ -117,7 +144,7 @@ class TaobaoClient {
         shopName: item.shop_title,
         shopScore: item.shop_dsr || '4.8',
         imageUrl: item.pict_url,
-        buyUrl: item.coupon_share_url || item.url,
+        buyUrl: item.coupon_share_url || item.url || item.click_url,
         taoToken: '',
         couponInfo: item.coupon_info || '',
         couponAmount: item.coupon_amount || '0',
