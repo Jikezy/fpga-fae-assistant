@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [hasApiKey, setHasApiKey] = useState(false)
+  const [maskedKey, setMaskedKey] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [modelName, setModelName] = useState('')
@@ -48,6 +49,7 @@ export default function SettingsPage() {
       if (response.ok) {
         const data = await response.json()
         setHasApiKey(data.hasApiKey)
+        setMaskedKey(data.maskedKey || '')
         setBaseUrl(data.baseUrl || '')
         setModelName(data.model || '')
         setApiFormat(data.apiFormat || 'auto')
@@ -109,6 +111,8 @@ export default function SettingsPage() {
         setMessage({ type: 'success', text: 'AI 配置已保存' })
         setHasApiKey(true)
         setApiKey('')
+        // 重新加载以刷新脱敏 Key 显示
+        loadSettings()
       } else {
         setMessage({ type: 'error', text: data.error || '保存失败' })
       }
@@ -249,11 +253,17 @@ export default function SettingsPage() {
               <label className="block text-sm font-medium text-gray-100 mb-2">
                 API Key
               </label>
+              {hasApiKey && maskedKey && (
+                <div className="mb-2 px-4 py-2 bg-gray-700/30 border border-gray-600/30 rounded-xl flex items-center gap-2">
+                  <span className="text-xs text-gray-400">当前 Key：</span>
+                  <code className="text-sm text-green-300 font-mono">{maskedKey}</code>
+                </div>
+              )}
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={hasApiKey ? '已配置（输入新 Key 更新）' : '输入你的 API Key'}
+                placeholder={hasApiKey ? '留空保持不变，输入新 Key 则覆盖' : '输入你的 API Key'}
                 className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100 placeholder-gray-400"
               />
             </div>

@@ -31,9 +31,21 @@ export async function GET(req: NextRequest) {
 
     const user = result[0] as any
 
+    // 脱敏显示 API Key：前4位 + **** + 后4位
+    let maskedKey = ''
+    if (user.anthropic_api_key) {
+      const key = user.anthropic_api_key
+      if (key.length > 8) {
+        maskedKey = key.slice(0, 4) + '····' + key.slice(-4)
+      } else {
+        maskedKey = '****'
+      }
+    }
+
     return NextResponse.json({
       success: true,
       hasApiKey: !!user.anthropic_api_key,
+      maskedKey,
       baseUrl: user.anthropic_base_url || '',
       model: user.ai_model || '',
       apiFormat: user.api_format || 'auto',
