@@ -5,12 +5,8 @@ import { useRouter } from 'next/navigation'
 
 // 预设平台配置
 const PRESETS = [
-  { name: '云雾 AI', baseUrl: 'https://yunwu.ai/v1', model: 'claude-opus-4-20250514', hint: 'yunwu.ai/console 获取 Key', format: 'auto' as const },
   { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'claude-sonnet-4-5-20250929', hint: 'openclaudecode.cn 获取 Key', format: 'auto' as const },
   { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key', format: 'openai' as const },
-  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', hint: 'platform.deepseek.com 获取 Key', format: 'openai' as const },
-  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-opus-4', hint: 'openrouter.ai 获取 Key', format: 'openai' as const },
-  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', hint: 'platform.openai.com 获取 Key', format: 'openai' as const },
 ]
 
 export default function SettingsPage() {
