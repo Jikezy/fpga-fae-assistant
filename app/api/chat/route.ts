@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     await ensureAiModelColumn()
     const sql = getSql()
     const userConfig = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, ai_model
+      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format
       FROM users
       WHERE id = ${authResult.user.id}
     `
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 创建 AI 服务实例
-    const aiService = new AIService({ apiKey, baseURL, model })
+    const aiService = new AIService({ apiKey, baseURL, model, format: user.api_format || 'auto' })
 
     // RAG: 检索相关文档
     let enhancedMessages = [...messages]

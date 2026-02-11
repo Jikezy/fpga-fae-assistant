@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation'
 
 // 预设平台配置
 const PRESETS = [
-  { name: '云雾 AI', baseUrl: 'https://yunwu.ai/v1', model: 'claude-opus-4-20250514', hint: 'yunwu.ai/console 获取 Key' },
-  { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'claude-sonnet-4-5-20250929', hint: 'openclaudecode.cn 获取 Key' },
-  { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key' },
-  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', hint: 'platform.deepseek.com 获取 Key' },
-  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-opus-4', hint: 'openrouter.ai 获取 Key' },
-  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', hint: 'platform.openai.com 获取 Key' },
+  { name: '云雾 AI', baseUrl: 'https://yunwu.ai/v1', model: 'claude-opus-4-20250514', hint: 'yunwu.ai/console 获取 Key', format: 'auto' as const },
+  { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'claude-sonnet-4-5-20250929', hint: 'openclaudecode.cn 获取 Key', format: 'auto' as const },
+  { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key', format: 'openai' as const },
+  { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', hint: 'platform.deepseek.com 获取 Key', format: 'openai' as const },
+  { name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-opus-4', hint: 'openrouter.ai 获取 Key', format: 'openai' as const },
+  { name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', hint: 'platform.openai.com 获取 Key', format: 'openai' as const },
 ]
 
 export default function SettingsPage() {
@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [modelName, setModelName] = useState('')
+  const [apiFormat, setApiFormat] = useState('auto')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export default function SettingsPage() {
         setHasApiKey(data.hasApiKey)
         setBaseUrl(data.baseUrl || '')
         setModelName(data.model || '')
+        setApiFormat(data.apiFormat || 'auto')
       }
     } catch (error) {
       console.error('加载设置失败:', error)
@@ -60,6 +62,7 @@ export default function SettingsPage() {
   const handlePreset = (preset: typeof PRESETS[number]) => {
     setBaseUrl(preset.baseUrl)
     setModelName(preset.model)
+    setApiFormat(preset.format)
     setMessage(null)
   }
 
@@ -84,6 +87,7 @@ export default function SettingsPage() {
       const body: any = {
         base_url: baseUrl,
         model_name: modelName,
+        api_format: apiFormat,
       }
       // 如果用户输入了新 key 则发送；否则仍需发送旧占位（后端需要非空）
       if (apiKey.trim()) {
@@ -131,6 +135,7 @@ export default function SettingsPage() {
         setApiKey('')
         setBaseUrl('')
         setModelName('')
+        setApiFormat('auto')
       }
     } catch (error) {
       setMessage({ type: 'error', text: '删除失败' })
@@ -192,7 +197,7 @@ export default function SettingsPage() {
             </div>
             {hasApiKey && baseUrl && (
               <p className="text-xs text-gray-400 mt-2 ml-6">
-                {baseUrl} / {modelName}
+                {baseUrl} / {modelName} / {apiFormat === 'openai' ? 'OpenAI格式' : apiFormat === 'anthropic' ? 'Anthropic格式' : '自动检测'}
               </p>
             )}
           </div>
@@ -266,6 +271,24 @@ export default function SettingsPage() {
               />
               <p className="mt-1 text-xs text-gray-400">
                 填写平台支持的模型 ID，可在对应平台文档中查看
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-100 mb-2">
+                API 格式
+              </label>
+              <select
+                value={apiFormat}
+                onChange={(e) => setApiFormat(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100"
+              >
+                <option value="auto">自动检测（先试 OpenAI，失败回退 Anthropic）</option>
+                <option value="openai">OpenAI Chat Completions（大多数中转站）</option>
+                <option value="anthropic">Anthropic Messages（官方原生格式）</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-400">
+                大多数中转站和第三方平台使用 OpenAI 格式；Anthropic 官方 API 使用原生格式。选错会导致请求失败。
               </p>
             </div>
           </div>

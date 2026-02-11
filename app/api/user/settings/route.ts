@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     await ensureAiModelColumn()
     const sql = getSql()
     const result = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, ai_model
+      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format
       FROM users
       WHERE id = ${authResult.user.id}
     `
@@ -36,6 +36,7 @@ export async function GET(req: NextRequest) {
       hasApiKey: !!user.anthropic_api_key,
       baseUrl: user.anthropic_base_url || '',
       model: user.ai_model || '',
+      apiFormat: user.api_format || 'auto',
     })
   } catch (error) {
     console.error('获取API配置失败:', error)
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { api_key, base_url, model_name } = await req.json()
+    const { api_key, base_url, model_name, api_format } = await req.json()
 
     await ensureAiModelColumn()
 
@@ -81,15 +82,17 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const format = api_format || 'auto'
     const sql = getSql()
 
     if (api_key === '__KEEP_EXISTING__') {
-      // 仅更新 base_url 和 model，保留现有 API Key
+      // 仅更新 base_url、model、api_format，保留现有 API Key
       await sql`
         UPDATE users
         SET
           anthropic_base_url = ${base_url},
-          ai_model = ${model_name}
+          ai_model = ${model_name},
+          api_format = ${format}
         WHERE id = ${authResult.user.id}
       `
     } else {
@@ -98,7 +101,8 @@ export async function POST(req: NextRequest) {
         SET
           anthropic_api_key = ${api_key},
           anthropic_base_url = ${base_url},
-          ai_model = ${model_name}
+          ai_model = ${model_name},
+          api_format = ${format}
         WHERE id = ${authResult.user.id}
       `
     }
@@ -132,7 +136,8 @@ export async function DELETE(req: NextRequest) {
       SET
         anthropic_api_key = NULL,
         anthropic_base_url = NULL,
-        ai_model = NULL
+        ai_model = NULL,
+        api_format = 'auto'
       WHERE id = ${authResult.user.id}
     `
 

@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     await ensureAiModelColumn()
     const sql = getSql()
     const userConfig = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, ai_model
+      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format
       FROM users
       WHERE id = ${authResult.user.id}
     `
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
-    const aiService = new AIService({ apiKey, baseURL, model })
+    const aiService = new AIService({ apiKey, baseURL, model, format: user.api_format || 'auto' })
 
     const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'
 

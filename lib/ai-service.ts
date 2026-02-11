@@ -9,11 +9,12 @@ export interface AIMessage {
   content: string
 }
 
-// AI 服务配置（BYOK：三个必填字段）
+// AI 服务配置（BYOK：三个必填字段 + 可选格式）
 export interface AIServiceConfig {
   apiKey: string
   baseURL: string
   model: string
+  format?: 'auto' | 'openai' | 'anthropic'
 }
 
 // 流式响应回调
@@ -180,16 +181,29 @@ export class AIService {
   }
 
   /**
-   * 流式聊天（自动检测格式）
-   * 先试 OpenAI 兼容格式，失败则试 Anthropic 原生格式
-   * 不依赖模型名判断，任何模型都会自动回退
+   * 流式聊天
+   * format='openai'  → 直接用 OpenAI 格式
+   * format='anthropic' → 直接用 Anthropic 格式
+   * format='auto'/undefined → 先试 OpenAI，失败回退 Anthropic
    */
   async streamChat(messages: AIMessage[], onChunk: StreamCallback): Promise<void> {
     if (!this.config.apiKey) {
       throw new Error('API Key 未配置')
     }
 
-    // 先试 OpenAI 格式
+    const format = this.config.format || 'auto'
+
+    if (format === 'openai') {
+      await this.streamChatOpenAI(messages, onChunk)
+      return
+    }
+
+    if (format === 'anthropic') {
+      await this.streamChatAnthropic(messages, onChunk)
+      return
+    }
+
+    // auto: 先试 OpenAI 格式
     try {
       await this.streamChatOpenAI(messages, onChunk)
       return

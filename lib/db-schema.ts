@@ -159,6 +159,11 @@ export async function initializeDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model TEXT
     `
 
+    // 添加 api_format 列（API 格式选择：auto/openai/anthropic）
+    await sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS api_format TEXT DEFAULT 'auto'
+    `
+
     console.log('数据库表初始化成功（含BOM模块）')
     return { success: true }
   } catch (error) {
@@ -188,8 +193,9 @@ export async function ensureAiModelColumn() {
   try {
     const sql = getSql()
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_model TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS api_format TEXT DEFAULT 'auto'`
     _aiModelMigrated = true
   } catch (e) {
-    console.error('ai_model 列迁移失败:', e)
+    console.error('ai_model/api_format 列迁移失败:', e)
   }
 }
