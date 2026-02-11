@@ -149,6 +149,15 @@ class TaobaoClient {
   }
 
   /**
+   * 获取联盟推广搜索链接模板（前端用 keyword 替换占位符）
+   */
+  getAffiliateUrlTemplate(): string | null {
+    if (this.isMock || !this.pid) return null
+    const pidParts = this.pid.replace('mm_', '').split('_')
+    return `https://uland.taobao.com/sem/tbsearch?refpid=${pidParts[0]}&keyword=__KEYWORD__&upsId=${pidParts[2]}`
+  }
+
+  /**
    * Mock 模式：不返回假价格，只提供淘宝搜索链接
    */
   private mockSearch(keyword: string): TaobaoProduct[] {

@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     apiConfigured: taobaoClient.isConfigured(),
+    affiliateUrlTemplate: taobaoClient.getAffiliateUrlTemplate(),
   })
 }
 

@@ -52,6 +52,7 @@ export default function ProjectDetailPage() {
   const [totalPrice, setTotalPrice] = useState(0)
   const [loading, setLoading] = useState(true)
   const [apiConfigured, setApiConfigured] = useState(false)
+  const [affiliateUrlTemplate, setAffiliateUrlTemplate] = useState<string | null>(null)
   const [searchingId, setSearchingId] = useState<string | null>(null)
   const [searchAllLoading, setSearchAllLoading] = useState(false)
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
@@ -91,6 +92,9 @@ export default function ProjectDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setApiConfigured(data.apiConfigured)
+        if (data.affiliateUrlTemplate) {
+          setAffiliateUrlTemplate(data.affiliateUrlTemplate)
+        }
       }
     } catch {}
   }
@@ -170,7 +174,9 @@ export default function ProjectDetailPage() {
   }
 
   const getTaobaoSearchUrl = (keyword: string) =>
-    `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`
+    affiliateUrlTemplate
+      ? affiliateUrlTemplate.replace('__KEYWORD__', encodeURIComponent(keyword))
+      : `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`
 
   const getLcscSearchUrl = (keyword: string) =>
     `https://so.szlcsc.com/global.html?k=${encodeURIComponent(keyword)}`
