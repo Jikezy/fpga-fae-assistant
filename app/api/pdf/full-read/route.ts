@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
+import { getUserAIConfig } from '@/lib/get-user-ai-config'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -50,26 +51,14 @@ export async function POST(req: NextRequest) {
     const estimatedInputTokens = estimatedPages * 1800
     const estimatedOutputTokens = 1500
 
-    // 获取用户的AI配置
-    const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
-    await ensureAiModelColumn()
-    const sql = getSql()
-    const userConfig = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, ai_model
-      FROM users
-      WHERE id = ${authResult.user.id}
-    `
-
-    const user = userConfig.length > 0 ? (userConfig[0] as any) : null
-    const apiKey = user?.anthropic_api_key
-    const baseURL = user?.anthropic_base_url
-    const model = user?.ai_model
+    // 获取用户的AI配置（优先新供应商系统，回退旧配置）
+    const config = await getUserAIConfig(authResult.user.id)
 
     // BYOK：未配置则 403
-    if (!apiKey || !baseURL || !model) {
+    if (!config) {
       return NextResponse.json({
         error: 'AI 未配置',
-        message: '请先在设置页面配置 AI 服务（Base URL、API Key、模型名称）',
+        message: '请先在 AI 服务管理页面配置供应商（Base URL、API Key、模型名称）',
         needsConfig: true,
       }, { status: 403 })
     }
@@ -79,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
-    const aiService = new AIService({ apiKey, baseURL, model })
+    const aiService = new AIService(config)
 
     // 创建流式响应
     const encoder = new TextEncoder()
