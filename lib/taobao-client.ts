@@ -90,6 +90,7 @@ class TaobaoClient {
    */
   async searchProducts(params: SearchParams): Promise<TaobaoProduct[]> {
     if (this.isMock) {
+      console.log('[TaobaoClient] Mock 模式，返回推广链接')
       return this.mockSearch(params.keyword)
     }
 
@@ -111,12 +112,24 @@ class TaobaoClient {
         apiParams.has_coupon = 'true'
       }
 
+      console.log('[TaobaoClient] 调用淘宝API:', {
+        method: 'taobao.tbk.dg.material.optional',
+        keyword: params.keyword,
+        adzone_id: apiParams.adzone_id,
+        appKey: this.appKey,
+        hasPid: !!this.pid,
+      })
+
       const result = await this.callApi('taobao.tbk.dg.material.optional', apiParams)
+
+      console.log('[TaobaoClient] API 原始响应:', JSON.stringify(result).substring(0, 500))
 
       // 检查响应
       if (result.error_response) {
         this.lastError = `淘宝API错误: ${result.error_response.sub_msg || result.error_response.msg}`
         console.error('[TaobaoClient] API错误:', result.error_response)
+        console.error('[TaobaoClient] 错误代码:', result.error_response.code)
+        console.error('[TaobaoClient] 错误详情:', result.error_response.sub_code)
         return this.fallbackSearch(params.keyword)
       }
 
@@ -124,10 +137,12 @@ class TaobaoClient {
 
       if (!data || data.length === 0) {
         this.lastError = '未找到商品'
+        console.warn('[TaobaoClient] 未找到商品，完整响应:', JSON.stringify(result))
         return this.fallbackSearch(params.keyword)
       }
 
       this.lastError = ''
+      console.log('[TaobaoClient] 成功获取商品:', data.length, '个')
 
       return data.map((item: any) => ({
         itemId: item.item_id,
@@ -148,6 +163,7 @@ class TaobaoClient {
     } catch (error: any) {
       this.lastError = `搜索失败: ${error.message}`
       console.error('[TaobaoClient] 搜索异常:', error)
+      console.error('[TaobaoClient] 异常堆栈:', error.stack)
       return this.fallbackSearch(params.keyword)
     }
   }

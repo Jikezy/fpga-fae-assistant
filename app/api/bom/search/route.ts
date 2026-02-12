@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       products,
       fromCache: false,
       apiConfigured: taobaoClient.isConfigured(),
-      apiDebug: taobaoClient.lastError || undefined,
+      apiError: taobaoClient.lastError || undefined,
     })
   } catch (error) {
     console.error('商品搜索错误:', error)
