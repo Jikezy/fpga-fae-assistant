@@ -45,6 +45,6 @@ export const config = {
      * - favicon.ico (网站图标)
      * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg|.*\\.txt).*)',
   ],
 }
