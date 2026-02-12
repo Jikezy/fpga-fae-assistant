@@ -50,33 +50,23 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
 
   if (userApiKey) {
     const primaryBaseUrl = userBaseUrl || defaultBaseUrl
-    candidates.push({
-      apiKey: userApiKey,
-      baseUrl: primaryBaseUrl,
-      source: 'user',
-    })
+    candidates.push({ apiKey: userApiKey, baseUrl: primaryBaseUrl, source: 'user' })
 
     if (primaryBaseUrl !== defaultBaseUrl) {
-      candidates.push({
-        apiKey: userApiKey,
-        baseUrl: defaultBaseUrl,
-        source: 'user-default-base',
-      })
+      candidates.push({ apiKey: userApiKey, baseUrl: defaultBaseUrl, source: 'user-default-base' })
     }
   }
 
   if (envApiKey && envApiKey !== userApiKey) {
-    candidates.push({
-      apiKey: envApiKey,
-      baseUrl: defaultBaseUrl,
-      source: 'env',
-    })
+    candidates.push({ apiKey: envApiKey, baseUrl: defaultBaseUrl, source: 'env' })
   }
 
   if (candidates.length === 0) {
-    console.warn('DeepSeek API key is missing in both user config and env, fallback to rule parser')
+    console.warn('DeepSeek API key missing, fallback to rule parser')
     return { ...fallbackResult, parseEngine: 'rule' }
   }
+
+  let lastErrorReason = ''
 
   for (const candidate of candidates) {
     try {
@@ -101,44 +91,166 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
 
       if (!response.ok) {
         const errText = await response.text()
+        lastErrorReason = `api_${response.status}_${candidate.source}`
         console.error(`DeepSeek API request failed (${candidate.source}):`, response.status, errText)
         continue
       }
 
       const data = await response.json()
-      const content = data.choices?.[0]?.message?.content
+      const content = data?.choices?.[0]?.message?.content
 
-      if (!content) {
+      if (typeof content !== 'string' || !content.trim()) {
+        lastErrorReason = `empty_content_${candidate.source}`
         console.error(`DeepSeek response content is empty (${candidate.source})`)
         continue
       }
 
-      const jsonMatch = content.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        console.error(`DeepSeek response does not contain JSON (${candidate.source}):`, content)
+      const payload = extractJsonPayload(content)
+      if (!payload) {
+        lastErrorReason = `json_extract_failed_${candidate.source}`
+        console.error(`DeepSeek response does not contain valid JSON (${candidate.source})`)
         continue
       }
 
-      const parsed = JSON.parse(jsonMatch[0]) as ParseResult
-      const cleanedItems = parsed.items.map(item => ({
-        ...item,
-        searchKeyword: cleanSearchKeyword(item.searchKeyword, item.name, item.category),
-      }))
+      const parsed = normalizeAiResponse(payload)
+      if (parsed.items.length === 0) {
+        lastErrorReason = `no_items_${candidate.source}`
+        console.error(`DeepSeek response has no valid items (${candidate.source})`)
+        continue
+      }
 
       return {
-        items: cleanedItems,
-        warnings: parsed.warnings || [],
+        items: parsed.items,
+        warnings: parsed.warnings,
         parseEngine: 'deepseek',
       }
     } catch (error) {
+      lastErrorReason = `exception_${candidate.source}`
       console.error(`DeepSeek parse exception (${candidate.source}):`, error)
       if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
-        console.warn(`DeepSeek request timeout (${candidate.source}), trying next candidate or fallback`)
+        lastErrorReason = `timeout_${candidate.source}`
       }
     }
   }
 
+  if (lastErrorReason) {
+    fallbackResult.warnings.push(`AI fallback: ${lastErrorReason}`)
+  }
+
   return { ...fallbackResult, parseEngine: 'rule' }
+}
+
+function extractJsonPayload(content: string): unknown | null {
+  const trimmed = content.trim()
+
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    // continue
+  }
+
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  if (fenced?.[1]) {
+    try {
+      return JSON.parse(fenced[1])
+    } catch {
+      // continue
+    }
+  }
+
+  const objectLike = trimmed.match(/\{[\s\S]*\}/)
+  if (objectLike?.[0]) {
+    try {
+      return JSON.parse(objectLike[0])
+    } catch {
+      // continue
+    }
+  }
+
+  const arrayLike = trimmed.match(/\[[\s\S]*\]/)
+  if (arrayLike?.[0]) {
+    try {
+      return JSON.parse(arrayLike[0])
+    } catch {
+      // continue
+    }
+  }
+
+  return null
+}
+
+function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: string[] } {
+  const warnings: string[] = []
+  let rawItems: unknown[] = []
+  let rawWarnings: unknown[] = []
+
+  if (Array.isArray(payload)) {
+    rawItems = payload
+  } else if (isRecord(payload)) {
+    if (Array.isArray(payload.items)) rawItems = payload.items
+    else if (Array.isArray(payload.components)) rawItems = payload.components
+    else if (Array.isArray(payload.parts)) rawItems = payload.parts
+
+    if (Array.isArray(payload.warnings)) rawWarnings = payload.warnings
+  }
+
+  for (const w of rawWarnings) {
+    if (typeof w === 'string' && w.trim()) warnings.push(w.trim())
+  }
+
+  const items: BomItem[] = []
+  for (const raw of rawItems) {
+    const normalized = normalizeAiItem(raw)
+    if (normalized) items.push(normalized)
+  }
+
+  return { items, warnings }
+}
+
+function normalizeAiItem(raw: unknown): BomItem | null {
+  if (!isRecord(raw)) return null
+
+  const name = pickFirstString(raw, ['name', 'model', 'part', 'component', '\u540D\u79F0', '\u5143\u5668\u4EF6'])
+  if (!name) return null
+
+  const spec = pickFirstString(raw, ['spec', 'value', 'package', 'footprint', '\u89C4\u683C']) || ''
+  const category = pickFirstString(raw, ['category', 'type', '\u5206\u7C7B']) || inferCategory(name, spec)
+  const quantityValue = pickFirstNumber(raw, ['quantity', 'qty', 'count', '\u6570\u91CF'])
+  const quantity = quantityValue && quantityValue > 0 ? Math.floor(quantityValue) : 1
+
+  const rawKeyword = pickFirstString(raw, ['searchKeyword', 'keyword', 'search', '\u641C\u7D22\u5173\u952E\u8BCD']) || `${name} ${spec}`.trim()
+
+  return {
+    name,
+    spec,
+    quantity,
+    searchKeyword: cleanSearchKeyword(rawKeyword, name, category),
+    category,
+  }
+}
+
+function pickFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = source[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
+function pickFirstNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = source[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /**
@@ -188,7 +300,7 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 30))
 
   const maxTokens = Math.max(512, Math.min(3072, 256 + estimatedItems * 40))
-  const timeoutMs = Math.max(9000, Math.min(18000, 7000 + estimatedItems * 160))
+  const timeoutMs = Math.max(6000, Math.min(12000, 5000 + estimatedItems * 90))
 
   return { maxTokens, timeoutMs }
 }
