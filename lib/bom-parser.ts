@@ -41,6 +41,7 @@ const BOM_SYSTEM_PROMPT = `你是电子元器件 BOM 解析专家。将文本解
 export async function parseBomText(text: string, userConfig?: { apiKey?: string; baseUrl?: string }): Promise<ParseResult> {
   const apiKey = userConfig?.apiKey || process.env.DEEPSEEK_API_KEY
   const baseUrl = userConfig?.baseUrl || 'https://api.deepseek.com'
+  const { maxTokens, timeoutMs } = getDynamicAiBudget(text)
 
   if (!apiKey) {
     console.warn('DeepSeek API Key 未配置（用户未配置且系统环境变量也为空），使用规则解析')
@@ -61,10 +62,10 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
           { role: 'system', content: BOM_SYSTEM_PROMPT },
           { role: 'user', content: text },
         ],
-        max_tokens: 512, // 降低到 512，BOM 解析通常不需要很长输出
+        max_tokens: maxTokens, // Dynamic budget for larger BOMs
         temperature: 0.1, // 降低到 0.1 减少采样时间，提高确定性
       }),
-      signal: AbortSignal.timeout(15000), // 15 秒超时，防止卡死
+      signal: AbortSignal.timeout(timeoutMs), // Dynamic timeout by input size
     })
 
     if (!response.ok) {
@@ -123,50 +124,123 @@ function ruleBasedParse(text: string): ParseResult {
   const items: BomItem[] = []
   const warnings: string[] = []
 
-  // 按行或分号分割
   const lines = text.split(/[\n;]/).filter(l => l.trim().length > 0)
 
   for (const line of lines) {
     const trimmed = line.trim()
     if (!trimmed) continue
 
-    // 尝试匹配常见格式：名称 规格 数量
-    const match = trimmed.match(/^([^\s]+)\s+([^\d]+)?\s*(\d+)?\s*$/i)
+    const { body, quantity } = extractTrailingQuantity(trimmed)
+    const normalizedBody = normalizeParsedText(body)
+    const { name, spec, lowConfidence } = splitNameAndSpec(normalizedBody)
+    const category = inferCategory(name, spec)
+    const rawKeyword = spec ? `${name} ${spec}` : name
 
-    if (match) {
-      const name = match[1]
-      const spec = match[2]?.trim() || ''
-      const quantity = match[3] ? parseInt(match[3]) : 1
-      const category = inferCategory(name, spec)
-      const rawKeyword = name + (spec ? ' ' + spec : '')
+    items.push({
+      name,
+      spec,
+      quantity,
+      searchKeyword: cleanSearchKeyword(rawKeyword, name, category),
+      category,
+    })
 
-      items.push({
-        name,
-        spec,
-        quantity,
-        searchKeyword: cleanSearchKeyword(rawKeyword, name, category),
-        category,
-      })
-    } else {
-      // 如果格式不匹配，整行作为一个元器件
-      const qty = trimmed.match(/\d+\s*$/)?.[0]
-      const qtyNum = qty ? parseInt(qty) : 1
-      const nameSpec = qty ? trimmed.slice(0, -qty.length).trim() : trimmed
-      const category = inferCategory(nameSpec, '')
-
-      items.push({
-        name: nameSpec,
-        spec: '',
-        quantity: qtyNum,
-        searchKeyword: cleanSearchKeyword(nameSpec, nameSpec, category),
-        category,
-      })
-
-      warnings.push(`无法准确解析: ${trimmed}`)
+    if (lowConfidence) {
+      warnings.push(`Rule parser low confidence: ${trimmed}`)
     }
   }
 
   return { items, warnings, parseEngine: 'rule' }
+}
+
+/**
+ * Scale AI response budget by BOM size to reduce JSON truncation fallback.
+ */
+function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: number } {
+  const meaningfulLines = text
+    .split(/[\n;]/)
+    .map(line => line.trim())
+    .filter(Boolean).length
+  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 30))
+
+  const maxTokens = Math.max(512, Math.min(3072, 256 + estimatedItems * 40))
+  const timeoutMs = Math.max(15000, Math.min(30000, 10000 + estimatedItems * 320))
+
+  return { maxTokens, timeoutMs }
+}
+
+/**
+ * Extract trailing quantity from formats like x2, ×2, 2pcs, 2个, or " ... 2".
+ */
+function extractTrailingQuantity(line: string): { body: string; quantity: number } {
+  const normalized = line.replace(/\s+/g, ' ').trim()
+  const quantityPatterns: RegExp[] = [
+    /(.*?)(?:\s*[x\u00D7*]\s*)(\d+)\s*$/i,
+    /(.*?)(\d+)\s*(?:pcs?|pc|\u4E2A|\u53EA|\u4EF6|\u9897|\u679A|\u5957|\u6761|EA)\s*$/i,
+    /(.*?)(?:\s+)(\d+)\s*$/,
+  ]
+
+  for (const pattern of quantityPatterns) {
+    const match = normalized.match(pattern)
+    if (!match) continue
+
+    const qty = parseInt(match[2], 10)
+    if (!Number.isFinite(qty) || qty <= 0) continue
+
+    const body = normalizeParsedText(match[1])
+    if (!body) break
+
+    return { body, quantity: qty }
+  }
+
+  return { body: normalizeParsedText(normalized), quantity: 1 }
+}
+
+/**
+ * Remove dangling suffix markers, e.g. trailing "x" after stripping quantity.
+ */
+function normalizeParsedText(text: string): string {
+  return text
+    .replace(/[\uFF0C,;\uFF1B\u3002]+$/g, '')
+    .replace(/\s*[x\u00D7*]\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Split name/spec only in high-confidence patterns to avoid over-splitting.
+ */
+function splitNameAndSpec(text: string): { name: string; spec: string; lowConfidence: boolean } {
+  if (!text) {
+    return { name: 'Unknown component', spec: '', lowConfidence: true }
+  }
+
+  const explicitParts = text
+    .split(/[\t,\uFF0C|]/)
+    .map(part => part.trim())
+    .filter(Boolean)
+
+  if (explicitParts.length >= 2) {
+    return {
+      name: explicitParts[0],
+      spec: explicitParts.slice(1).join(' '),
+      lowConfidence: false,
+    }
+  }
+
+  const modelLikeSplit = text.match(/^([A-Za-z][A-Za-z0-9._+-]{2,})\s+(.+)$/)
+  if (modelLikeSplit) {
+    const spec = modelLikeSplit[2].trim()
+    const hasStrongSpecHint = /^(?:LQFP|QFP|TQFP|QFN|BGA|SOT|SOD|SOP|DIP|SOIC|0402|0603|0805|1206|1210|2010|2512|\d+(?:\.\d+)?\s*(?:R|K|M|\u03A9|OHM|UF|NF|PF|V|A))/i.test(spec)
+    if (hasStrongSpecHint) {
+      return {
+        name: modelLikeSplit[1],
+        spec,
+        lowConfidence: false,
+      }
+    }
+  }
+
+  return { name: text, spec: '', lowConfidence: true }
 }
 
 /**

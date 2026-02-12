@@ -18,6 +18,7 @@ export default function BomUploadPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [parseStatus, setParseStatus] = useState('')
 
   const exampleBom = `STM32F103C8T6 最小系统板 x2
 0805贴片电容 100nF x50
@@ -59,6 +60,7 @@ USB Type-C 接口模块 x2`
 
     setLoading(true)
     setError('')
+    setParseStatus('AI 正在分析文本...')
 
     try {
       const res = await fetch('/api/bom/parse', {
@@ -72,12 +74,15 @@ USB Type-C 接口模块 x2`
 
       const data = await res.json()
       if (!res.ok) { setError(data.error || '解析失败'); return }
+
+      setParseStatus('解析完成，正在跳转...')
       router.push(`/bom/project/${data.project.id}?engine=${data.parseEngine || 'unknown'}`)
     } catch (err) {
       setError('网络错误，请重试')
       console.error(err)
     } finally {
       setLoading(false)
+      setParseStatus('')
     }
   }
 
@@ -89,11 +94,14 @@ USB Type-C 接口模块 x2`
 
     setLoading(true)
     setError('')
+    setParseStatus('正在上传文件...')
 
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
       if (projectName) formData.append('projectName', projectName)
+
+      setParseStatus('AI 正在解析文件...')
 
       const res = await fetch('/api/bom/upload', {
         method: 'POST',
@@ -102,12 +110,15 @@ USB Type-C 接口模块 x2`
 
       const data = await res.json()
       if (!res.ok) { setError(data.error || '解析失败'); return }
+
+      setParseStatus('解析完成，正在跳转...')
       router.push(`/bom/project/${data.project.id}?engine=${data.parseEngine || 'unknown'}`)
     } catch (err) {
       setError('网络错误，请重试')
       console.error(err)
     } finally {
       setLoading(false)
+      setParseStatus('')
     }
   }
 
@@ -322,7 +333,10 @@ USB Type-C 接口模块 x2`
               {loading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  AI 正在解析...
+                  <span className="flex flex-col items-center gap-0.5">
+                    <span>{parseStatus}</span>
+                    <span className="text-xs text-white/80">预计 5-10 秒</span>
+                  </span>
                 </>
               ) : (
                 <>

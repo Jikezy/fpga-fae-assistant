@@ -143,8 +143,8 @@ export function parseExcelBuffer(buffer: Buffer, filename: string): string {
     }
     // IC 芯片：不添加封装信息，保持型号简洁
 
-    // 数量：格式统一为 " x数字"（空格+x+数字）
-    if (qty > 1) {
+    // 数量：只有大于1且有效时才添加
+    if (qty > 1 && !isNaN(qty)) {
       finalText += ` x${qty}`
     }
 
