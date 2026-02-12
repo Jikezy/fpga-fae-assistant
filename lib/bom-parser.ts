@@ -215,8 +215,17 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
 
     if (valueMatch) {
       const value = valueMatch[1]
-      const unit = valueMatch[2]?.toUpperCase() || 'Ω'
-      cleaned = `${value}${unit === 'R' ? 'Ω' : unit}电阻${pkg ? ' ' + pkg : ''}`
+      let unit = valueMatch[2]?.toUpperCase() || 'R'
+      // 转换为中文电商常用格式：R→欧姆，K保持，Ω→K
+      if (unit === 'Ω' || unit === 'OHM') unit = 'R'
+      if (unit === 'R' && parseFloat(value) >= 1000) {
+        // 1000R 及以上转换为 K
+        const kValue = parseFloat(value) / 1000
+        cleaned = pkg ? `贴片电阻 ${kValue}K ${pkg}` : `${kValue}K电阻`
+      } else {
+        // SMD 封装加"贴片"前缀
+        cleaned = pkg ? `贴片电阻 ${value}${unit} ${pkg}` : `${value}${unit}电阻`
+      }
     } else if (!/电阻|res/.test(lowerKeyword)) {
       cleaned = `${cleaned} 电阻`.trim()
     }
@@ -228,7 +237,10 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
     const pkg = packageMatch ? packageMatch[0] : ''
 
     if (valueMatch) {
-      cleaned = `${valueMatch[1]}${valueMatch[2] || ''}F电容${pkg ? ' ' + pkg : ''}`
+      const value = valueMatch[1]
+      const unit = valueMatch[2]?.toLowerCase() || ''
+      // SMD 封装加"贴片"前缀
+      cleaned = pkg ? `贴片电容 ${value}${unit}F ${pkg}` : `${value}${unit}F电容`
     } else if (!/电容|cap/.test(lowerKeyword)) {
       cleaned = `${cleaned} 电容`.trim()
     }
