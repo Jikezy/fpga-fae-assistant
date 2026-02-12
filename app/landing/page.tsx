@@ -330,7 +330,10 @@ export default function LandingPage() {
         <footer className="container mx-auto px-4 py-12 border-t border-gray-200/50">
           <div className="text-center text-gray-600">
             <p className="mb-2">© 2026 FPGA FAE助手. All rights reserved.</p>
-            <p className="text-sm">Powered by Claude Opus 4 × Neon PostgreSQL</p>
+            <p className="text-sm mb-1">Powered by Claude Opus 4 × Neon PostgreSQL</p>
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              鄂ICP备2026007985号
+            </a>
           </div>
         </footer>
       </div>
