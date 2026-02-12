@@ -169,10 +169,16 @@ export default function ProjectDetailPage() {
     }
   }
 
-  const getTaobaoSearchUrl = (keyword: string) =>
-    affiliateUrlTemplate
-      ? affiliateUrlTemplate.replace('__KEYWORD__', encodeURIComponent(keyword))
-      : `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`
+  const getTaobaoSearchUrl = (keyword: string) => {
+    const encodedKeyword = encodeURIComponent(keyword)
+    const directUrl = `https://s.taobao.com/search?q=${encodedKeyword}&sort=sale-desc`
+
+    // uland occasionally renders blank pages for non-ascii keywords; use direct search in that case.
+    const hasNonAscii = /[^\u0020-\u007E]/.test(keyword)
+    if (!affiliateUrlTemplate || hasNonAscii) return directUrl
+
+    return affiliateUrlTemplate.replace('__KEYWORD__', encodedKeyword)
+  }
 
   const getLcscSearchUrl = (keyword: string) =>
     `https://so.szlcsc.com/global.html?k=${encodeURIComponent(keyword)}`

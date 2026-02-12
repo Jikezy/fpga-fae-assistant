@@ -46,14 +46,23 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
   const { maxTokens, timeoutMs } = getDynamicAiBudget(text)
   const fallbackResult = ruleBasedParse(text)
 
-  const candidates: Array<{ apiKey: string; baseUrl: string; source: 'user' | 'env' }> = []
+  const candidates: Array<{ apiKey: string; baseUrl: string; source: string }> = []
 
   if (userApiKey) {
+    const primaryBaseUrl = userBaseUrl || defaultBaseUrl
     candidates.push({
       apiKey: userApiKey,
-      baseUrl: userBaseUrl || defaultBaseUrl,
+      baseUrl: primaryBaseUrl,
       source: 'user',
     })
+
+    if (primaryBaseUrl !== defaultBaseUrl) {
+      candidates.push({
+        apiKey: userApiKey,
+        baseUrl: defaultBaseUrl,
+        source: 'user-default-base',
+      })
+    }
   }
 
   if (envApiKey && envApiKey !== userApiKey) {
@@ -85,6 +94,7 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
           ],
           max_tokens: maxTokens,
           temperature: 0.1,
+          response_format: { type: 'json_object' },
         }),
         signal: AbortSignal.timeout(timeoutMs),
       })
