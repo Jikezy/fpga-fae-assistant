@@ -54,7 +54,6 @@ export default function ProjectDetailPage() {
   const [apiConfigured, setApiConfigured] = useState(false)
   const [affiliateUrlTemplate, setAffiliateUrlTemplate] = useState<string | null>(null)
   const [searchingId, setSearchingId] = useState<string | null>(null)
-  const [searchAllLoading, setSearchAllLoading] = useState(false)
   const [expandedItem, setExpandedItem] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [editingKeyword, setEditingKeyword] = useState<string | null>(null)
@@ -138,11 +137,17 @@ export default function ProjectDetailPage() {
             const products = data.products || []
             const best = products[0]
             // 修复：确保空字符串或无效价格返回 null
-            const price = best && best.price && best.price.trim() !== '' ? parseFloat(best.price) : null
+            let price: number | null = null
+            if (best && best.price && best.price.trim() !== '') {
+              const parsedPrice = parseFloat(best.price)
+              if (!isNaN(parsedPrice) && parsedPrice > 0) {
+                price = parsedPrice
+              }
+            }
             return {
               ...i,
               search_results: products,
-              best_price: !isNaN(price) ? price : null,
+              best_price: price,
               buy_url: best?.buyUrl || null,
               tao_token: best?.taoToken || null,
               status: products.length > 0 ? 'found' : 'pending',
@@ -161,50 +166,6 @@ export default function ProjectDetailPage() {
       console.error('搜索失败:', error)
     } finally {
       setSearchingId(null)
-    }
-  }
-
-  const searchAll = async () => {
-    setSearchAllLoading(true)
-    for (const item of items) {
-      if (item.status === 'pending' || !item.search_results) {
-        await searchItem(item)
-        await new Promise(r => setTimeout(r, 500))
-      }
-    }
-    setSearchAllLoading(false)
-  }
-
-  const clearCacheAndSearch = async () => {
-    if (!confirm('将清除所有淘宝搜索缓存并重新搜索，是否继续？')) {
-      return
-    }
-
-    try {
-      setSearchAllLoading(true)
-
-      // 清除缓存
-      const clearRes = await fetch('/api/bom/clear-cache', { method: 'DELETE' })
-      if (!clearRes.ok) {
-        alert('清除缓存失败')
-        return
-      }
-
-      // 等待1秒确保缓存清除
-      await new Promise(r => setTimeout(r, 1000))
-
-      // 重新搜索所有
-      for (const item of items) {
-        await searchItem(item)
-        await new Promise(r => setTimeout(r, 500))
-      }
-
-      alert('缓存已清除，搜索完成！')
-    } catch (error) {
-      console.error('操作失败:', error)
-      alert('操作失败，请查看控制台')
-    } finally {
-      setSearchAllLoading(false)
     }
   }
 
@@ -386,7 +347,6 @@ export default function ProjectDetailPage() {
     )
   }
 
-  const isMock = !apiConfigured
   // 检查是否有任何元器件有真实价格数据
   const hasPriceData = items.some(item => item.best_price && !isNaN(item.best_price) && item.best_price > 0)
 
