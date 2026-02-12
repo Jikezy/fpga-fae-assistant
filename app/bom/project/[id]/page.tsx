@@ -173,6 +173,39 @@ export default function ProjectDetailPage() {
     setSearchAllLoading(false)
   }
 
+  const clearCacheAndSearch = async () => {
+    if (!confirm('将清除所有淘宝搜索缓存并重新搜索，是否继续？')) {
+      return
+    }
+
+    try {
+      setSearchAllLoading(true)
+
+      // 清除缓存
+      const clearRes = await fetch('/api/bom/clear-cache', { method: 'DELETE' })
+      if (!clearRes.ok) {
+        alert('清除缓存失败')
+        return
+      }
+
+      // 等待1秒确保缓存清除
+      await new Promise(r => setTimeout(r, 1000))
+
+      // 重新搜索所有
+      for (const item of items) {
+        await searchItem(item)
+        await new Promise(r => setTimeout(r, 500))
+      }
+
+      alert('缓存已清除，搜索完成！')
+    } catch (error) {
+      console.error('操作失败:', error)
+      alert('操作失败，请查看控制台')
+    } finally {
+      setSearchAllLoading(false)
+    }
+  }
+
   const getTaobaoSearchUrl = (keyword: string) =>
     affiliateUrlTemplate
       ? affiliateUrlTemplate.replace('__KEYWORD__', encodeURIComponent(keyword))
@@ -421,19 +454,36 @@ export default function ProjectDetailPage() {
           <div className="flex flex-wrap gap-3 items-center">
             {/* 真实 API 模式下才显示"一键搜索" */}
             {!isMock && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={searchAll}
-                disabled={searchAllLoading}
-                className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-400 text-white font-semibold rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-2"
-              >
-                {searchAllLoading ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> 搜索中...</>
-                ) : (
-                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg> 一键搜索全部</>
-                )}
-              </motion.button>
+              <>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={searchAll}
+                  disabled={searchAllLoading}
+                  className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-400 text-white font-semibold rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-2"
+                >
+                  {searchAllLoading ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> 搜索中...</>
+                  ) : (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg> 一键搜索全部</>
+                  )}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={clearCacheAndSearch}
+                  disabled={searchAllLoading}
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-purple-400 text-white font-semibold rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-2"
+                  title="清除缓存并重新搜索全部"
+                >
+                  {searchAllLoading ? (
+                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> 清除中...</>
+                  ) : (
+                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> 清除缓存重搜</>
+                  )}
+                </motion.button>
+              </>
             )}
 
             {/* 多平台一键打开按钮 */}
