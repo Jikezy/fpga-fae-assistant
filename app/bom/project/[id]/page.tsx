@@ -191,7 +191,8 @@ export default function ProjectDetailPage() {
   }
 
   // 勾选/取消勾选
-  const toggleSelect = (itemId: string) => {
+  const toggleSelect = (itemId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation() // 阻止事件冒泡
     setSelectedItems(prev => {
       const next = new Set(prev)
       if (next.has(itemId)) next.delete(itemId)
@@ -200,7 +201,8 @@ export default function ProjectDetailPage() {
     })
   }
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation() // 阻止事件冒泡
     if (selectedItems.size === items.length) {
       setSelectedItems(new Set())
     } else {
@@ -476,7 +478,8 @@ export default function ProjectDetailPage() {
             {/* 已访问进度 + 清除 */}
             {visitedItems.size > 0 && (
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation() // 阻止事件冒泡
                   setVisitedItems(new Set())
                   localStorage.removeItem(`bom-visited-${projectId}`)
                 }}
@@ -535,7 +538,7 @@ export default function ProjectDetailPage() {
                       <input
                         type="checkbox"
                         checked={selectedItems.has(item.id)}
-                        onChange={() => toggleSelect(item.id)}
+                        onChange={(e) => toggleSelect(item.id, e as any)}
                         className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500"
                       />
                     </div>
@@ -682,7 +685,7 @@ export default function ProjectDetailPage() {
                         <input
                           type="checkbox"
                           checked={selectedItems.has(item.id)}
-                          onChange={() => toggleSelect(item.id)}
+                          onChange={(e) => toggleSelect(item.id, e as any)}
                           className="w-4 h-4 mt-0.5 rounded border-gray-300 text-orange-500 focus:ring-orange-400 cursor-pointer accent-orange-500 flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
