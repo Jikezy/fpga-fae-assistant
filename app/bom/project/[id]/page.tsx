@@ -137,10 +137,12 @@ export default function ProjectDetailPage() {
           if (i.id === item.id) {
             const products = data.products || []
             const best = products[0]
+            // 修复：确保空字符串或无效价格返回 null
+            const price = best && best.price && best.price.trim() !== '' ? parseFloat(best.price) : null
             return {
               ...i,
               search_results: products,
-              best_price: best && best.price ? parseFloat(best.price) : null,
+              best_price: !isNaN(price) ? price : null,
               buy_url: best?.buyUrl || null,
               tao_token: best?.taoToken || null,
               status: products.length > 0 ? 'found' : 'pending',
@@ -385,6 +387,8 @@ export default function ProjectDetailPage() {
   }
 
   const isMock = !apiConfigured
+  // 检查是否有任何元器件有真实价格数据
+  const hasPriceData = items.some(item => item.best_price && !isNaN(item.best_price) && item.best_price > 0)
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -424,7 +428,7 @@ export default function ProjectDetailPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              {!isMock && totalPrice > 0 && (
+              {hasPriceData && totalPrice > 0 && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-2">
                   <span className="text-sm text-gray-600">估算总价：</span>
                   <span className="text-lg font-bold text-orange-600">¥{totalPrice.toFixed(2)}</span>
@@ -436,14 +440,18 @@ export default function ProjectDetailPage() {
 
         {/* 使用提示 */}
         <div className="container mx-auto px-4 pt-4 max-w-6xl">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-            <svg className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <div>
-              <p className="text-sm font-medium text-blue-800">采购提示</p>
-              <p className="text-sm text-blue-600 mt-1">
-                点击「立创」搜索电子元器件（推荐），「1688」适合批量采购，「淘宝」适合零散购买。可点击搜索关键词进行编辑优化。
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-orange-800 mb-1">💡 智能采购助手</p>
+              <p className="text-sm text-orange-700 leading-relaxed">
+                点击平台按钮将跳转到对应搜索页面查看全部商品：<span className="font-medium">「立创商城」</span>专注电子元器件（推荐），<span className="font-medium">「1688」</span>适合批量采购，<span className="font-medium">「淘宝」</span>适合零散购买。
+              </p>
+              <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                通过本系统的淘宝链接购买，开发者可获得推广佣金，感谢支持！
               </p>
             </div>
           </div>
@@ -452,40 +460,6 @@ export default function ProjectDetailPage() {
         {/* Action Buttons */}
         <div className="container mx-auto px-4 py-4 max-w-6xl">
           <div className="flex flex-wrap gap-3 items-center">
-            {/* 真实 API 模式下才显示"一键搜索" */}
-            {!isMock && (
-              <>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={searchAll}
-                  disabled={searchAllLoading}
-                  className="px-5 py-2.5 bg-gradient-to-r from-orange-500 to-orange-400 text-white font-semibold rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-2"
-                >
-                  {searchAllLoading ? (
-                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> 搜索中...</>
-                  ) : (
-                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg> 一键搜索全部</>
-                  )}
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={clearCacheAndSearch}
-                  disabled={searchAllLoading}
-                  className="px-5 py-2.5 bg-gradient-to-r from-purple-500 to-purple-400 text-white font-semibold rounded-xl shadow-lg disabled:opacity-50 flex items-center gap-2"
-                  title="清除缓存并重新搜索全部"
-                >
-                  {searchAllLoading ? (
-                    <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> 清除中...</>
-                  ) : (
-                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> 清除缓存重搜</>
-                  )}
-                </motion.button>
-              </>
-            )}
-
             {/* 多平台一键打开按钮 */}
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -560,7 +534,7 @@ export default function ProjectDetailPage() {
         <div className="container mx-auto px-4 pb-8 max-w-6xl">
           <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-2xl border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.08)] overflow-hidden">
             {/* Table Header */}
-            <div className={`hidden md:grid gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500 ${isMock ? 'grid-cols-12' : 'grid-cols-14'}`} style={{ gridTemplateColumns: isMock ? '32px 40px 2.5fr 2fr 60px 4fr' : '32px 40px 2.5fr 2fr 60px 1fr 1fr 4fr' }}>
+            <div className={`hidden md:grid gap-4 px-6 py-3 bg-gray-50/80 border-b border-gray-200/60 text-sm font-medium text-gray-500 ${hasPriceData ? 'grid-cols-14' : 'grid-cols-12'}`} style={{ gridTemplateColumns: hasPriceData ? '32px 40px 2.5fr 2fr 60px 1fr 1fr 4fr' : '32px 40px 2.5fr 2fr 60px 4fr' }}>
               <div className="flex items-center">
                 <input
                   type="checkbox"
@@ -573,7 +547,7 @@ export default function ProjectDetailPage() {
               <div>元器件</div>
               <div>搜索关键词</div>
               <div>数量</div>
-              {!isMock && (
+              {hasPriceData && (
                 <>
                   <div>单价</div>
                   <div>小计</div>
@@ -595,7 +569,7 @@ export default function ProjectDetailPage() {
                         ? 'bg-green-50/40 hover:bg-green-50/60'
                         : 'hover:bg-orange-50/30'
                     }`}
-                    style={{ gridTemplateColumns: isMock ? '32px 40px 2.5fr 2fr 60px 4fr' : '32px 40px 2.5fr 2fr 60px 1fr 1fr 4fr' }}
+                    style={{ gridTemplateColumns: hasPriceData ? '32px 40px 2.5fr 2fr 60px 1fr 1fr 4fr' : '32px 40px 2.5fr 2fr 60px 4fr' }}
                   >
                     <div className="flex items-center">
                       <input
@@ -642,17 +616,17 @@ export default function ProjectDetailPage() {
                     <div>
                       <span className="text-sm text-gray-800">{item.quantity}</span>
                     </div>
-                    {!isMock && (
+                    {hasPriceData && (
                       <>
                         <div>
-                          {item.best_price ? (
-                            <span className="text-sm font-medium text-orange-600">¥{item.best_price}</span>
+                          {item.best_price && !isNaN(item.best_price) && item.best_price > 0 ? (
+                            <span className="text-sm font-medium text-orange-600">¥{item.best_price.toFixed(2)}</span>
                           ) : (
                             <span className="text-sm text-gray-400">-</span>
                           )}
                         </div>
                         <div>
-                          {item.best_price ? (
+                          {item.best_price && !isNaN(item.best_price) && item.best_price > 0 ? (
                             <span className="text-sm font-bold text-orange-600">
                               ¥{(item.best_price * item.quantity).toFixed(2)}
                             </span>
@@ -663,7 +637,7 @@ export default function ProjectDetailPage() {
                       </>
                     )}
                     <div className="flex items-center gap-2">
-                      {!isMock && (
+                      {hasPriceData && (
                         <button
                           onClick={() => searchItem(item)}
                           disabled={searchingId === item.id}
@@ -728,7 +702,7 @@ export default function ProjectDetailPage() {
                         )}
                       </button>
 
-                      {!isMock && item.search_results && item.search_results.length > 0 && (
+                      {hasPriceData && item.search_results && item.search_results.length > 0 && (
                         <button
                           onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}
                           className="px-3 py-1.5 bg-gray-50 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-100 transition-all"
@@ -796,16 +770,16 @@ export default function ProjectDetailPage() {
                         </button>
                       )}
                     </div>
-                    {/* 价格（仅真实 API 模式） */}
-                    {!isMock && item.best_price && (
+                    {/* 价格（仅有价格数据时显示） */}
+                    {hasPriceData && item.best_price && !isNaN(item.best_price) && item.best_price > 0 && (
                       <div className="mb-2">
                         <span className="text-xs font-bold text-orange-600">
-                          ¥{item.best_price} / 小计 ¥{(item.best_price * item.quantity).toFixed(2)}
+                          ¥{item.best_price.toFixed(2)} / 小计 ¥{(item.best_price * item.quantity).toFixed(2)}
                         </span>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      {!isMock && (
+                      {hasPriceData && (
                         <button
                           onClick={() => searchItem(item)}
                           disabled={searchingId === item.id}
@@ -850,7 +824,7 @@ export default function ProjectDetailPage() {
                       >
                         淘宝
                       </a>
-                      {!isMock && item.search_results && item.search_results.length > 0 && (
+                      {hasPriceData && item.search_results && item.search_results.length > 0 && (
                         <button
                           onClick={() => setExpandedItem(expandedItem === item.id ? null : item.id)}
                           className="px-3 py-2 bg-gray-50 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-100 transition-all"
@@ -861,8 +835,8 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
 
-                  {/* 展开的搜索结果（仅真实 API 模式） */}
-                  {!isMock && expandedItem === item.id && item.search_results && (
+                  {/* 展开的搜索结果（仅有价格数据时显示） */}
+                  {hasPriceData && expandedItem === item.id && item.search_results && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
