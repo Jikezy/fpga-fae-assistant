@@ -182,7 +182,6 @@ function extractJsonPayload(content: string): unknown | null {
 function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: string[] } {
   const warnings: string[] = []
   let rawItems: unknown[] = []
-  let rawWarnings: unknown[] = []
 
   if (Array.isArray(payload)) {
     rawItems = payload
@@ -190,12 +189,18 @@ function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: st
     if (Array.isArray(payload.items)) rawItems = payload.items
     else if (Array.isArray(payload.components)) rawItems = payload.components
     else if (Array.isArray(payload.parts)) rawItems = payload.parts
+    else {
+      const guessed = findArrayLikeValue(payload)
+      if (guessed) rawItems = guessed
+    }
 
-    if (Array.isArray(payload.warnings)) rawWarnings = payload.warnings
-  }
-
-  for (const w of rawWarnings) {
-    if (typeof w === 'string' && w.trim()) warnings.push(w.trim())
+    if (Array.isArray(payload.warnings)) {
+      for (const w of payload.warnings) {
+        if (typeof w === 'string' && w.trim()) warnings.push(w.trim())
+      }
+    } else if (typeof payload.warning === 'string' && payload.warning.trim()) {
+      warnings.push(payload.warning.trim())
+    }
   }
 
   const items: BomItem[] = []
@@ -210,15 +215,17 @@ function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: st
 function normalizeAiItem(raw: unknown): BomItem | null {
   if (!isRecord(raw)) return null
 
-  const name = pickFirstString(raw, ['name', 'model', 'part', 'component', '\u540D\u79F0', '\u5143\u5668\u4EF6'])
+  const source = isRecord(raw.item) ? raw.item : raw
+
+  const name = pickFirstString(source, ['name', 'model', 'part', 'component', '名称', '元器件'])
   if (!name) return null
 
-  const spec = pickFirstString(raw, ['spec', 'value', 'package', 'footprint', '\u89C4\u683C']) || ''
-  const category = pickFirstString(raw, ['category', 'type', '\u5206\u7C7B']) || inferCategory(name, spec)
-  const quantityValue = pickFirstNumber(raw, ['quantity', 'qty', 'count', '\u6570\u91CF'])
+  const spec = pickFirstString(source, ['spec', 'value', 'package', 'footprint', '规格']) || ''
+  const category = pickFirstString(source, ['category', 'type', '分类']) || inferCategory(name, spec)
+  const quantityValue = pickFirstNumber(source, ['quantity', 'qty', 'count', '数量'])
   const quantity = quantityValue && quantityValue > 0 ? Math.floor(quantityValue) : 1
 
-  const rawKeyword = pickFirstString(raw, ['searchKeyword', 'keyword', 'search', '\u641C\u7D22\u5173\u952E\u8BCD']) || `${name} ${spec}`.trim()
+  const rawKeyword = pickFirstString(source, ['searchKeyword', 'keyword', 'search', '搜索关键词']) || `${name} ${spec}`.trim()
 
   return {
     name,
@@ -230,33 +237,66 @@ function normalizeAiItem(raw: unknown): BomItem | null {
 }
 
 function pickFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
+  const lowerMap = createLowerKeyMap(source)
+
   for (const key of keys) {
-    const value = source[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    const direct = source[key]
+    if (typeof direct === 'string' && direct.trim()) return direct.trim()
+
+    const lowered = lowerMap.get(normalizeKey(key))
+    if (typeof lowered === 'string' && lowered.trim()) return lowered.trim()
   }
+
   return undefined
 }
 
 function pickFirstNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
+  const lowerMap = createLowerKeyMap(source)
+
   for (const key of keys) {
-    const value = source[key]
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-    if (typeof value === 'string') {
-      const parsed = Number(value)
-      if (Number.isFinite(parsed)) return parsed
+    const values = [source[key], lowerMap.get(normalizeKey(key))]
+
+    for (const value of values) {
+      if (typeof value === 'number' && Number.isFinite(value)) return value
+      if (typeof value === 'string') {
+        const parsed = Number(value)
+        if (Number.isFinite(parsed)) return parsed
+      }
     }
   }
+
   return undefined
+}
+
+function findArrayLikeValue(source: Record<string, unknown>): unknown[] | null {
+  for (const value of Object.values(source)) {
+    if (!Array.isArray(value) || value.length === 0) continue
+
+    const first = value[0]
+    if (isRecord(first) || typeof first === 'string') {
+      return value
+    }
+  }
+
+  return null
+}
+
+function createLowerKeyMap(source: Record<string, unknown>): Map<string, unknown> {
+  const map = new Map<string, unknown>()
+  for (const [key, value] of Object.entries(source)) {
+    map.set(normalizeKey(key), value)
+  }
+  return map
+}
+
+function normalizeKey(key: string): string {
+  return key.toLowerCase().replace(/[\s_-]/g, '')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/**
- * 规则引擎：当 DeepSeek API 不可用时的降级方案
- * 基于正则表达式和关键词匹配解析
- */
 function ruleBasedParse(text: string): ParseResult {
   const items: BomItem[] = []
   const warnings: string[] = []
@@ -300,7 +340,7 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 30))
 
   const maxTokens = Math.max(512, Math.min(3072, 256 + estimatedItems * 40))
-  const timeoutMs = Math.max(6000, Math.min(12000, 5000 + estimatedItems * 90))
+  const timeoutMs = Math.max(10000, Math.min(25000, 8000 + estimatedItems * 180))
 
   return { maxTokens, timeoutMs }
 }
