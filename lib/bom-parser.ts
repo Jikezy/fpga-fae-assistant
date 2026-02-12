@@ -148,7 +148,7 @@ function ruleBasedParse(text: string): ParseResult {
     }
   }
 
-  return { items, warnings }
+  return { items, warnings, parseEngine: 'rule' }
 }
 
 /**
