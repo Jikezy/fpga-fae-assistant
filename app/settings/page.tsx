@@ -330,7 +330,7 @@ export default function SettingsPage() {
                 <li><strong>规则引擎（降级）</strong>：简单正则匹配，不配置 Key 时自动使用，识别准确度较低</li>
               </ul>
               <p className="text-xs text-yellow-200 mt-2">
-                如果你看到"规则引擎"标识，说明没有配置 DeepSeek Key，建议配置以获得更好的解析效果。
+                如果你看到&quot;规则引擎&quot;标识，说明没有配置 DeepSeek Key，建议配置以获得更好的解析效果。
               </p>
             </div>
 
