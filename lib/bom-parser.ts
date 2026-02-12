@@ -183,6 +183,7 @@ function inferCategory(name: string, spec: string): string {
 
 /**
  * 清理和优化搜索关键词，使其更适合淘宝搜索
+ * 保留关键封装信息，移除 EDA 专用参数
  */
 function cleanSearchKeyword(keyword: string, name: string, category: string): string {
   if (!keyword || keyword.trim() === '') {
@@ -191,42 +192,69 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
 
   let cleaned = keyword.trim()
 
-  // 1. 移除常见的封装代码和尺寸参数
+  // 1. 移除 EDA 软件生成的库代码前缀（但保留封装类型）
+  // 例如：SW-TH_4P-L6.0-W6.0 → 保留有用部分，去掉尺寸
   cleaned = cleaned
-    .replace(/[_-]?(LCC|LGA|QFN|QFP|TQFP|LQFP|BGA|CSP|SOP|SSOP|TSOP|TSSOP|DIP|SOT|TO|DO|SMD|THT|SW-TH)[_-]?[\w-]*/gi, '')
-    .replace(/[_-]?[LWH][\d.]+[_-]?/gi, '') // L17.7, W15.8, H2.5
-    .replace(/[_-]?\d+P[_-]?/gi, '') // 4P, 6P
-    .replace(/[_-]?\d+Pin[_-]?/gi, '') // 4Pin, 6Pin
+    .replace(/SW-TH[_-][\w-]*/gi, '') // 移除 SW-TH 开关库代码
+    .replace(/LCC-LGA-\d+[_-]?[LWH][\d.-]*/gi, 'LCC') // LCC-LGA-109_L17.7 → LCC
+    .replace(/[_-]?[LWH][\d.]+(-[LWH][\d.]+)*/gi, '') // 移除 L17.7-W15.8-H2.5
     .trim()
 
-  // 2. 针对不同类别优化
+  // 2. 提取并保留标准封装信息
+  const packageMatch = cleaned.match(/(R|C|L)?(0201|0402|0603|0805|1206|1210|2010|2512)|QFP-?\d+|LQFP-?\d+|TQFP-?\d+|BGA-?\d+|SOT-?\d+|SOD-?\d+|DIP-?\d+|SOP-?\d+/gi)
+  const sizeMatch = cleaned.match(/(\d+)[x×](\d+)/i) // 提取 6x6、12x12 等尺寸
+
+  // 3. 针对不同类别优化
   const lowerName = name.toLowerCase()
   const lowerKeyword = cleaned.toLowerCase()
 
-  // 电阻：确保有"电阻"关键词
-  if (category === '电阻' && !/电阻|res|ohm/.test(lowerKeyword)) {
-    if (/\d+k|k\d+/i.test(cleaned)) {
-      cleaned = cleaned.replace(/(\d+k)/i, '$1电阻')
-    } else if (/\d+ω|ω\d+/i.test(cleaned)) {
-      cleaned = cleaned.replace(/([\d.]+)ω/i, '$1电阻')
-    } else {
+  // 电阻：保留阻值和封装
+  if (category === '电阻') {
+    const valueMatch = cleaned.match(/([\d.]+)(k|K|M|m|R|r|Ω|ω|ohm)?/i)
+    const pkg = packageMatch ? packageMatch[0] : ''
+
+    if (valueMatch) {
+      const value = valueMatch[1]
+      const unit = valueMatch[2]?.toUpperCase() || 'Ω'
+      cleaned = `${value}${unit === 'R' ? 'Ω' : unit}电阻${pkg ? ' ' + pkg : ''}`
+    } else if (!/电阻|res/.test(lowerKeyword)) {
       cleaned = `${cleaned} 电阻`.trim()
     }
   }
 
-  // 电容：确保有"电容"关键词
-  if (category === '电容' && !/电容|cap/.test(lowerKeyword)) {
-    cleaned = `${cleaned} 电容`.trim()
+  // 电容：保留容值和封装
+  else if (category === '电容') {
+    const valueMatch = cleaned.match(/([\d.]+)(p|n|u|m)?F/i)
+    const pkg = packageMatch ? packageMatch[0] : ''
+
+    if (valueMatch) {
+      cleaned = `${valueMatch[1]}${valueMatch[2] || ''}F电容${pkg ? ' ' + pkg : ''}`
+    } else if (!/电容|cap/.test(lowerKeyword)) {
+      cleaned = `${cleaned} 电容`.trim()
+    }
   }
 
-  // 连接器/开关：简化为通用名称
-  if (category === '连接器') {
+  // 芯片：保留型号和封装
+  else if (category === '芯片') {
+    // 提取主型号（通常是字母数字组合）
+    const chipModel = cleaned.split(/[\s_-]/)[0]
+    const pkg = packageMatch ? packageMatch[0] : ''
+
+    cleaned = `${chipModel}${pkg ? ' ' + pkg : ''}`
+  }
+
+  // 连接器：简化为通用名称，但保留类型
+  else if (category === '连接器') {
     if (/usb/i.test(lowerKeyword)) {
-      cleaned = 'USB接口'
-    } else if (/type-?c/i.test(lowerKeyword)) {
-      cleaned = 'Type-C接口'
-    } else if (/micro/i.test(lowerKeyword)) {
-      cleaned = 'Micro USB接口'
+      if (/type-?c/i.test(lowerKeyword)) {
+        cleaned = 'Type-C接口'
+      } else if (/micro/i.test(lowerKeyword)) {
+        cleaned = 'Micro USB接口'
+      } else if (/mini/i.test(lowerKeyword)) {
+        cleaned = 'Mini USB接口'
+      } else {
+        cleaned = 'USB接口'
+      }
     } else if (/排针|pin.?header/i.test(lowerKeyword)) {
       cleaned = '排针'
     } else if (/排母|socket/i.test(lowerKeyword)) {
@@ -236,32 +264,37 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
     }
   }
 
-  // 开关/按键：简化
-  if (/开关|switch|按键|button/i.test(lowerKeyword)) {
+  // 开关/按键：保留尺寸
+  else if (/开关|switch|按键|button/i.test(lowerKeyword)) {
     if (/轻触|tact/i.test(lowerKeyword)) {
-      const size = cleaned.match(/(\d+)[x×](\d+)/i)
-      cleaned = size ? `轻触开关 ${size[1]}x${size[2]}` : '轻触开关'
+      if (sizeMatch) {
+        cleaned = `轻触开关 ${sizeMatch[1]}x${sizeMatch[2]}`
+      } else {
+        cleaned = '轻触开关'
+      }
     } else if (/拨动|slide/i.test(lowerKeyword)) {
       cleaned = '拨动开关'
     } else {
-      cleaned = '按键开关'
+      cleaned = sizeMatch ? `按键开关 ${sizeMatch[1]}x${sizeMatch[2]}` : '按键开关'
     }
   }
 
-  // 3. 移除多余空格和特殊字符
+  // 4. 通用清理：移除多余空格和特殊字符
   cleaned = cleaned
-    .replace(/[_\-]{2,}/g, '-') // 多个连字符合并
+    .replace(/[_]{2,}/g, '_') // 多个下划线合并
+    .replace(/[-]{2,}/g, '-') // 多个连字符合并
     .replace(/\s{2,}/g, ' ') // 多个空格合并
     .replace(/^[_\-\s]+|[_\-\s]+$/g, '') // 移除首尾特殊字符
     .trim()
 
-  // 4. 如果清理后为空或太短，使用原名称
+  // 5. 如果清理后为空或太短，使用原名称
   if (cleaned.length < 2) {
     cleaned = name.split(/[_\-\s]/)[0] // 取第一个单词
   }
 
-  // 5. 限制长度（淘宝搜索建议 ≤ 30 字符）
+  // 6. 限制长度（淘宝搜索建议 ≤ 30 字符）
   if (cleaned.length > 30) {
+    // 优先保留前面的型号部分
     cleaned = cleaned.substring(0, 30)
   }
 
