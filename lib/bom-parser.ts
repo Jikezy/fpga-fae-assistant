@@ -24,12 +24,15 @@ const BOM_SYSTEM_PROMPT = `你是电子元器件 BOM 解析专家。将文本解
 - name: 元器件名称（如 STM32F103C8T6、10kΩ电阻）
 - spec: 规格（如封装、阻值，不重复 name）
 - quantity: 数量（默认1）
-- searchKeyword: 淘宝搜索关键词，去掉封装尺寸、焊盘等EDA信息
-  例："ML307C-DC-CN LCC-LGA-109" → "ML307C-DC-CN"
-  例："10kΩ R0805" → "10K电阻 0805"
+- searchKeyword: 淘宝搜索关键词，要求简短（≤20字符）
+  * 去掉所有 LCC/LGA/QFN/SW-TH/LCC-LGA 等封装代码
+  * 去掉 L17.7/W15.8/4P/6P 等尺寸参数
+  * 芯片只保留型号：ML307C-DC-CN、STM32F103C8T6
+  * 电阻电容加通用名：10K电阻 0805、10uF电容
+  * 连接器/开关加通用名：USB接口、按键开关、排针
 - category: 芯片/电容/电阻/电感/二极管/三极管/模块/连接器/线材/工具/其他
 
-只返回JSON：{"items": [...], "warnings": [...]}`
+只返回JSON：{"items": [...], "warnings": []}`
 
 /**
  * 使用 DeepSeek AI 解析 BOM 文本
@@ -53,13 +56,13 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'deepseek-coder', // 使用 deepseek-coder 更快
         messages: [
           { role: 'system', content: BOM_SYSTEM_PROMPT },
           { role: 'user', content: text },
         ],
-        max_tokens: 2048,
-        temperature: 0.5, // 提高到 0.5 加快推理速度
+        max_tokens: 1024, // 从 2048 降到 1024
+        temperature: 0.7, // 提高到 0.7 加快速度
       }),
     })
 
@@ -88,8 +91,15 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
     }
 
     const parsed = JSON.parse(jsonMatch[0]) as ParseResult
+
+    // 清理和优化搜索关键词
+    const cleanedItems = parsed.items.map(item => ({
+      ...item,
+      searchKeyword: cleanSearchKeyword(item.searchKeyword, item.name, item.category)
+    }))
+
     return {
-      items: parsed.items || [],
+      items: cleanedItems,
       warnings: parsed.warnings || [],
       parseEngine: 'deepseek',
     }
@@ -169,4 +179,91 @@ function inferCategory(name: string, spec: string): string {
   if (/工具|tool|焊/.test(text)) return '工具'
 
   return '其他'
+}
+
+/**
+ * 清理和优化搜索关键词，使其更适合淘宝搜索
+ */
+function cleanSearchKeyword(keyword: string, name: string, category: string): string {
+  if (!keyword || keyword.trim() === '') {
+    keyword = name
+  }
+
+  let cleaned = keyword.trim()
+
+  // 1. 移除常见的封装代码和尺寸参数
+  cleaned = cleaned
+    .replace(/[_-]?(LCC|LGA|QFN|QFP|TQFP|LQFP|BGA|CSP|SOP|SSOP|TSOP|TSSOP|DIP|SOT|TO|DO|SMD|THT|SW-TH)[_-]?[\w-]*/gi, '')
+    .replace(/[_-]?[LWH][\d.]+[_-]?/gi, '') // L17.7, W15.8, H2.5
+    .replace(/[_-]?\d+P[_-]?/gi, '') // 4P, 6P
+    .replace(/[_-]?\d+Pin[_-]?/gi, '') // 4Pin, 6Pin
+    .trim()
+
+  // 2. 针对不同类别优化
+  const lowerName = name.toLowerCase()
+  const lowerKeyword = cleaned.toLowerCase()
+
+  // 电阻：确保有"电阻"关键词
+  if (category === '电阻' && !/电阻|res|ohm/.test(lowerKeyword)) {
+    if (/\d+k|k\d+/i.test(cleaned)) {
+      cleaned = cleaned.replace(/(\d+k)/i, '$1电阻')
+    } else if (/\d+ω|ω\d+/i.test(cleaned)) {
+      cleaned = cleaned.replace(/([\d.]+)ω/i, '$1电阻')
+    } else {
+      cleaned = `${cleaned} 电阻`.trim()
+    }
+  }
+
+  // 电容：确保有"电容"关键词
+  if (category === '电容' && !/电容|cap/.test(lowerKeyword)) {
+    cleaned = `${cleaned} 电容`.trim()
+  }
+
+  // 连接器/开关：简化为通用名称
+  if (category === '连接器') {
+    if (/usb/i.test(lowerKeyword)) {
+      cleaned = 'USB接口'
+    } else if (/type-?c/i.test(lowerKeyword)) {
+      cleaned = 'Type-C接口'
+    } else if (/micro/i.test(lowerKeyword)) {
+      cleaned = 'Micro USB接口'
+    } else if (/排针|pin.?header/i.test(lowerKeyword)) {
+      cleaned = '排针'
+    } else if (/排母|socket/i.test(lowerKeyword)) {
+      cleaned = '排母'
+    } else if (/杜邦|dupont/i.test(lowerKeyword)) {
+      cleaned = '杜邦线'
+    }
+  }
+
+  // 开关/按键：简化
+  if (/开关|switch|按键|button/i.test(lowerKeyword)) {
+    if (/轻触|tact/i.test(lowerKeyword)) {
+      const size = cleaned.match(/(\d+)[x×](\d+)/i)
+      cleaned = size ? `轻触开关 ${size[1]}x${size[2]}` : '轻触开关'
+    } else if (/拨动|slide/i.test(lowerKeyword)) {
+      cleaned = '拨动开关'
+    } else {
+      cleaned = '按键开关'
+    }
+  }
+
+  // 3. 移除多余空格和特殊字符
+  cleaned = cleaned
+    .replace(/[_\-]{2,}/g, '-') // 多个连字符合并
+    .replace(/\s{2,}/g, ' ') // 多个空格合并
+    .replace(/^[_\-\s]+|[_\-\s]+$/g, '') // 移除首尾特殊字符
+    .trim()
+
+  // 4. 如果清理后为空或太短，使用原名称
+  if (cleaned.length < 2) {
+    cleaned = name.split(/[_\-\s]/)[0] // 取第一个单词
+  }
+
+  // 5. 限制长度（淘宝搜索建议 ≤ 30 字符）
+  if (cleaned.length > 30) {
+    cleaned = cleaned.substring(0, 30)
+  }
+
+  return cleaned
 }
