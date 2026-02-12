@@ -95,9 +95,9 @@ class TaobaoClient {
     }
 
     // 生成带 PID 的淘宝联盟推广搜索链接
-    const pid = this.pid // mm_9962389207_3393350325_116235600072
-    const pidParts = pid.replace('mm_', '').split('_')
-    const unionUrl = `https://uland.taobao.com/sem/tbsearch?refpid=${pidParts[0]}&keyword=${encodeURIComponent(params.keyword)}&clk1=&upsId=${pidParts[2]}`
+    // refpid 必须是完整的 mm_xxx_xxx_xxx 格式，否则无法追踪佣金
+    const pidParts = this.pid.replace('mm_', '').split('_')
+    const unionUrl = `https://uland.taobao.com/sem/tbsearch?refpid=${this.pid}&keyword=${encodeURIComponent(params.keyword)}&clk1=&upsId=${pidParts[2]}`
 
     // 同时生成普通淘宝搜索链接作为备用
     const searchUrl = `https://s.taobao.com/search?q=${encodeURIComponent(params.keyword)}&sort=sale-desc`
@@ -154,7 +154,7 @@ class TaobaoClient {
   getAffiliateUrlTemplate(): string | null {
     if (this.isMock || !this.pid) return null
     const pidParts = this.pid.replace('mm_', '').split('_')
-    return `https://uland.taobao.com/sem/tbsearch?refpid=${pidParts[0]}&keyword=__KEYWORD__&upsId=${pidParts[2]}`
+    return `https://uland.taobao.com/sem/tbsearch?refpid=${this.pid}&keyword=__KEYWORD__&clk1=&upsId=${pidParts[2]}`
   }
 
   /**
