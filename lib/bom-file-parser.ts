@@ -182,6 +182,7 @@ function mergeRows(rows: ExtractedRow[]): ExtractedRow[] {
  * - IC: name="STM32F103C8T6", value="STM32F103C8T6" → 只显示一次
  * - 电阻: name="R_0805", value="10kΩ" → 显示 "10kΩ"
  * - 电容: name="C_0805", value="100nF" → 显示 "100nF"
+ * - 晶振: name="晶振", value="12MHz" → 显示 "12MHz晶振"
  */
 function getDisplayName(name: string, value: string): string {
   if (!value) return name
@@ -198,13 +199,18 @@ function getDisplayName(name: string, value: string): string {
     return value
   }
 
-  // value 看起来像阻值/容值（10k, 100nF, 4.7uF 等）→ value 为主，name 为补充
+  // value 看起来像阻值/容值（10k, 100nF, 4.7uF 等）→ value 为主
   if (/^\d+\.?\d*\s*(k|m|u|n|p|μ)?(Ω|ω|ohm|f|h|v)?$/i.test(value)) {
     return value
   }
 
-  // 其他情况：name 和 value 都有意义，拼接
-  return `${name} ${value}`
+  // value 是晶振频率（12MHz, 16MHz等）→ 频率+类型名称
+  if (/^\d+\.?\d*\s*[MmKk]?Hz$/i.test(value)) {
+    return `${value}${name}`
+  }
+
+  // 其他情况：name 和 value 都有意义，拼接（value在前，更重要）
+  return `${value} ${name}`
 }
 
 /**

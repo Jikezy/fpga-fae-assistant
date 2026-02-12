@@ -259,21 +259,16 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
     }
   }
 
-  // 芯片：只保留主型号，去掉所有封装信息
+  // 芯片：保留完整型号，只去掉封装代码前缀
   else if (category === '芯片') {
-    // 先按空格/下划线分割，取第一部分作为基础
-    const parts = cleaned.split(/[\s_]/)
-    let mainModel = parts[0] || cleaned
+    // 移除 EDA 库代码前缀（如 SW-TH, LCC-LGA），但保留完整芯片型号
+    cleaned = cleaned.replace(/^(SW-TH|LCC-LGA|SOT|QFP|BGA|LQFP|TQFP)[-_]/gi, '')
 
-    // 移除 EDA 库代码前缀（如 SW-TH, LCC-LGA）
-    mainModel = mainModel.replace(/^(SW-TH|LCC-LGA|SOT|QFP|BGA|LQFP|TQFP)[-_]/gi, '')
+    // 移除封装后缀（通常在空格或下划线后）
+    // 例如：STM32H750VBT6 LQFP100 → STM32H750VBT6
+    cleaned = cleaned.replace(/[\s_]+([LQFP|QFP|BGA|SOT|SOP|DIP|SOIC]+[-\d]+)$/i, '')
 
-    // 确保主型号不为空
-    if (!mainModel || mainModel.length < 3) {
-      mainModel = cleaned.split(/[\s_-]/)[0] || cleaned
-    }
-
-    cleaned = mainModel.trim()
+    cleaned = cleaned.trim()
   }
 
   // 连接器：简化为通用名称，但保留类型
