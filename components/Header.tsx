@@ -79,14 +79,14 @@ export default function Header({ onMenuClick }: HeaderProps) {
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all active:scale-95"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-blue-200">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-purple-200">
                 <span className="text-white text-sm font-medium">
                   {user.email[0].toUpperCase()}
                 </span>
               </div>
               <span className="text-sm text-gray-800 font-medium hidden md:block">{user.email}</span>
               {user.role === 'admin' && (
-                <span className="px-2 py-0.5 bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 text-xs rounded-full font-semibold shadow ring-1 ring-blue-300">
+                <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 text-xs rounded-full font-semibold shadow ring-1 ring-purple-300">
                   管理员
                 </span>
               )}

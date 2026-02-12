@@ -39,7 +39,7 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
 
   return (
     <div className="max-w-4xl mx-auto px-2 py-2 sm:px-4 sm:py-4">
-      <div className="flex gap-2 sm:gap-3 items-end bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] focus-within:border-blue-300 focus-within:shadow-[0_12px_40px_rgba(59,130,246,0.15)] transition-all">
+      <div className="flex gap-2 sm:gap-3 items-end bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-2xl sm:rounded-3xl p-3 sm:p-4 border border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] focus-within:border-purple-300 focus-within:shadow-[0_12px_40px_rgba(124,58,237,0.15)] transition-all">
         <textarea
           ref={textareaRef}
           value={input}
@@ -64,7 +64,7 @@ export default function ChatInput({ onSend, disabled, isGenerating, onStop }: Ch
           <button
             onClick={handleSubmit}
             disabled={disabled || !input.trim()}
-            className="p-2.5 bg-gradient-to-br from-blue-400 to-blue-600 text-white rounded-2xl hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0 shadow-lg ring-1 ring-blue-300"
+            className="p-2.5 bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0 shadow-lg ring-1 ring-purple-300"
             aria-label="发送消息"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
