@@ -105,6 +105,9 @@ export default function SettingsPage() {
       // BOM Key
       if (bomApiKey.trim()) {
         body.bom_api_key = bomApiKey
+      } else if (hasBomKey) {
+        // 已有 key，留空则保持不变
+        body.bom_api_key = '__KEEP_EXISTING__'
       }
 
       const response = await fetch('/api/user/settings', {
@@ -317,10 +320,19 @@ export default function SettingsPage() {
 
           {/* BOM 解析配置 */}
           <div className="space-y-4 border-t border-gray-600/30 pt-6">
-            <h2 className="text-lg font-semibold text-gray-100">BOM 解析配置（DeepSeek）</h2>
-            <p className="text-xs text-gray-400">
-              BOM 元器件解析使用 DeepSeek API。不配置则使用系统默认接口，配置后优先用你自己的。
-            </p>
+            <h2 className="text-lg font-semibold text-gray-100">BOM 解析配置（可选）</h2>
+            <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl p-3">
+              <p className="text-xs text-yellow-200">
+                ⚠️ BOM 元器件解析支持两种模式：
+              </p>
+              <ul className="text-xs text-yellow-200 mt-2 space-y-1 ml-4">
+                <li><strong>AI 解析（推荐）</strong>：准确识别元器件名称、规格、封装，需要配置 DeepSeek API Key</li>
+                <li><strong>规则引擎（降级）</strong>：简单正则匹配，不配置 Key 时自动使用，识别准确度较低</li>
+              </ul>
+              <p className="text-xs text-yellow-200 mt-2">
+                如果你看到"规则引擎"标识，说明没有配置 DeepSeek Key，建议配置以获得更好的解析效果。
+              </p>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-100 mb-2">
@@ -381,7 +393,7 @@ export default function SettingsPage() {
               <li>- 本系统使用 BYOK（自带 Key）模式，需要您自行配置 AI 服务</li>
               <li>- 支持任何 OpenAI 兼容格式的 API（云雾AI、SiliconFlow、DeepSeek、OpenRouter、OpenAI 等）</li>
               <li>- 配置完成后即可在对话页面使用 AI 功能</li>
-              <li>- BOM 解析使用系统内置服务，不受此设置影响</li>
+              <li>- BOM 解析可选配置 DeepSeek API，不配置则使用规则引擎（识别准确度较低）</li>
               <li>- API Key 安全存储，仅您可见</li>
             </ul>
           </div>

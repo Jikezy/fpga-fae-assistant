@@ -139,6 +139,7 @@ export async function POST(req: NextRequest) {
     if (bom_api_key !== undefined && bom_api_key !== '' && bom_api_key !== '__KEEP_EXISTING__') {
       await sql`UPDATE users SET bom_api_key = ${bom_api_key} WHERE id = ${authResult.user.id}`
     }
+    // 如果是 __KEEP_EXISTING__ 则保持不变，不更新
 
     return NextResponse.json({
       success: true,
