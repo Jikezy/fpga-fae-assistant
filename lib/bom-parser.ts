@@ -56,14 +56,15 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-coder', // 使用 deepseek-coder 更快
+        model: 'deepseek-chat', // deepseek-chat 比 coder 快 3-5 倍
         messages: [
           { role: 'system', content: BOM_SYSTEM_PROMPT },
           { role: 'user', content: text },
         ],
-        max_tokens: 1024, // 从 2048 降到 1024
-        temperature: 0.7, // 提高到 0.7 加快速度
+        max_tokens: 512, // 降低到 512，BOM 解析通常不需要很长输出
+        temperature: 0.1, // 降低到 0.1 减少采样时间，提高确定性
       }),
+      signal: AbortSignal.timeout(15000), // 15 秒超时，防止卡死
     })
 
     if (!response.ok) {
@@ -105,6 +106,10 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
     }
   } catch (error) {
     console.error('DeepSeek 解析异常:', error)
+    // 超时或网络错误时自动降级
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+      console.warn('DeepSeek API 超时（15秒），自动降级到规则引擎')
+    }
     const result = ruleBasedParse(text)
     return { ...result, parseEngine: 'rule' }
   }
@@ -195,9 +200,9 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
 
   let cleaned = keyword.trim()
 
-  // 0. 移除 Excel 解析时添加的标记：[封装:xxx] 和 x数量
-  cleaned = cleaned.replace(/\[封装[：:][^\]]*\]/g, '') // 移除 [封装:0805]
-  cleaned = cleaned.replace(/\s*x\d+\s*$/i, '') // 移除末尾的 x2, x10 等
+  // 0. 移除 Excel 解析时的标记和数量后缀
+  cleaned = cleaned.replace(/[封装封裝]$/g, '') // 移除末尾的"封装"字样
+  cleaned = cleaned.replace(/\s+x\d*\s*$/i, '') // 移除末尾的 x2, x10, 或单独的 x
   cleaned = cleaned.trim()
 
   // 1. 移除 EDA 软件生成的库代码前缀（但保留封装类型）
@@ -256,14 +261,19 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
 
   // 芯片：只保留主型号，去掉所有封装信息
   else if (category === '芯片') {
-    // 提取主型号（去掉封装和库代码）
-    // 例如：ML307C-DC-CN → ML307C，STM32F103C8T6 → STM32F103C8T6
-    const parts = cleaned.split(/[\s_]/)[0] // 先按空格/下划线分割，取第一部分
-    // 对于连字符，只在特定情况下分割（如 SW-TH, LCC-LGA 等库代码前缀）
-    const mainModel = parts.replace(/^(SW-TH|LCC-LGA)-?/gi, '')
+    // 先按空格/下划线分割，取第一部分作为基础
+    const parts = cleaned.split(/[\s_]/)
+    let mainModel = parts[0] || cleaned
 
-    // 只保留型号，不加封装
-    cleaned = mainModel
+    // 移除 EDA 库代码前缀（如 SW-TH, LCC-LGA）
+    mainModel = mainModel.replace(/^(SW-TH|LCC-LGA|SOT|QFP|BGA|LQFP|TQFP)[-_]/gi, '')
+
+    // 确保主型号不为空
+    if (!mainModel || mainModel.length < 3) {
+      mainModel = cleaned.split(/[\s_-]/)[0] || cleaned
+    }
+
+    cleaned = mainModel.trim()
   }
 
   // 连接器：简化为通用名称，但保留类型

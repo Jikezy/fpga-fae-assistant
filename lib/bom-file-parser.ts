@@ -118,22 +118,37 @@ export function parseExcelBuffer(buffer: Buffer, filename: string): string {
   const merged = mergeRows(allRows)
 
   // 输出结构化文本，便于 AI 或规则引擎解析
+  // 格式：名称 + 封装(如有) + 数量(如>1)
   return merged.map(row => {
-    const parts: string[] = []
-
-    // 确定显示名称：优先用 value（如果 value 和 name 不同且 value 是有意义的型号）
     const displayName = getDisplayName(row.name, row.value)
-    parts.push(displayName)
-
-    // 封装信息（清理后）
     const cleanFp = cleanFootprint(row.footprint)
-    if (cleanFp) parts.push(`[封装:${cleanFp}]`)
-
-    // 数量
     const qty = parseInt(row.quantity) || 1
-    if (qty > 1) parts.push(`x${qty}`)
 
-    return parts.join(' ')
+    // 根据元器件类型决定是否显示封装
+    // 电阻/电容：值+封装 (如 "10K 0805")
+    // IC芯片：只显示型号 (如 "STM32F103C8T6")
+    // 其他：名称+封装(如 "按键开关 6x6")
+
+    let finalText = displayName
+
+    // 检测是否为阻容元件（通过 value 判断）
+    const isPassive = /^\d+\.?\d*\s*(k|m|u|n|p|μ)?(Ω|ω|ohm|f|h)?$/i.test(row.value)
+
+    if (isPassive && cleanFp && /^(0201|0402|0603|0805|1206|1210|2010|2512)$/i.test(cleanFp)) {
+      // 阻容类：显示值+封装，如 "10K 0805"
+      finalText = `${displayName} ${cleanFp}`
+    } else if (cleanFp && !/^(lqfp|qfp|bga|sot|sop|dip|soic)/i.test(cleanFp)) {
+      // 非 IC 封装（连接器、开关等）：加上封装描述
+      finalText = `${displayName} ${cleanFp}封装`
+    }
+    // IC 芯片：不添加封装信息，保持型号简洁
+
+    // 数量：格式统一为 " x数字"（空格+x+数字）
+    if (qty > 1) {
+      finalText += ` x${qty}`
+    }
+
+    return finalText
   }).join('\n')
 }
 
