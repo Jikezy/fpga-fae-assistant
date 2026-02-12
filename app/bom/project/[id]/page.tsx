@@ -171,13 +171,22 @@ export default function ProjectDetailPage() {
 
   const getTaobaoSearchUrl = (keyword: string) => {
     const encodedKeyword = encodeURIComponent(keyword)
-    const directUrl = `https://s.taobao.com/search?q=${encodedKeyword}&sort=sale-desc`
 
-    // uland occasionally renders blank pages for non-ascii keywords; use direct search in that case.
-    const hasNonAscii = /[^\u0020-\u007E]/.test(keyword)
-    if (!affiliateUrlTemplate || hasNonAscii) return directUrl
+    if (!affiliateUrlTemplate) {
+      return `https://s.taobao.com/search?q=${encodedKeyword}&sort=sale-desc`
+    }
 
-    return affiliateUrlTemplate.replace('__KEYWORD__', encodedKeyword)
+    // Keep affiliate link for commission and add a non-empty clk1 to improve stability.
+    const clk1 = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`
+    let url = affiliateUrlTemplate.replace('__KEYWORD__', encodedKeyword)
+
+    if (url.includes('clk1=&')) {
+      url = url.replace('clk1=&', `clk1=${clk1}&`)
+    } else if (url.endsWith('clk1=')) {
+      url = `${url}${clk1}`
+    }
+
+    return url
   }
 
   const getLcscSearchUrl = (keyword: string) =>
