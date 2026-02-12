@@ -39,81 +39,96 @@ const BOM_SYSTEM_PROMPT = `你是电子元器件 BOM 解析专家。将文本解
  * 优先用用户自己的 DeepSeek 配置，回退到系统环境变量，最后降级规则解析
  */
 export async function parseBomText(text: string, userConfig?: { apiKey?: string; baseUrl?: string }): Promise<ParseResult> {
-  const apiKey = userConfig?.apiKey || process.env.DEEPSEEK_API_KEY
-  const baseUrl = userConfig?.baseUrl || 'https://api.deepseek.com'
+  const userApiKey = userConfig?.apiKey?.trim()
+  const envApiKey = process.env.DEEPSEEK_API_KEY?.trim()
+  const userBaseUrl = normalizeBaseUrl(userConfig?.baseUrl)
+  const defaultBaseUrl = 'https://api.deepseek.com'
   const { maxTokens, timeoutMs } = getDynamicAiBudget(text)
+  const fallbackResult = ruleBasedParse(text)
 
-  if (!apiKey) {
-    console.warn('DeepSeek API Key 未配置（用户未配置且系统环境变量也为空），使用规则解析')
-    const result = ruleBasedParse(text)
-    return { ...result, parseEngine: 'rule' }
-  }
+  const candidates: Array<{ apiKey: string; baseUrl: string; source: 'user' | 'env' }> = []
 
-  try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek-chat', // deepseek-chat 比 coder 快 3-5 倍
-        messages: [
-          { role: 'system', content: BOM_SYSTEM_PROMPT },
-          { role: 'user', content: text },
-        ],
-        max_tokens: maxTokens, // Dynamic budget for larger BOMs
-        temperature: 0.1, // 降低到 0.1 减少采样时间，提高确定性
-      }),
-      signal: AbortSignal.timeout(timeoutMs), // Dynamic timeout by input size
+  if (userApiKey) {
+    candidates.push({
+      apiKey: userApiKey,
+      baseUrl: userBaseUrl || defaultBaseUrl,
+      source: 'user',
     })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      console.error('DeepSeek API 请求失败:', response.status, errText)
-      const result = ruleBasedParse(text)
-      return { ...result, parseEngine: 'rule' }
-    }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content
-
-    if (!content) {
-      console.error('DeepSeek 返回内容为空')
-      const result = ruleBasedParse(text)
-      return { ...result, parseEngine: 'rule' }
-    }
-
-    // 提取 JSON
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      console.error('DeepSeek 返回内容不包含 JSON:', content)
-      const result = ruleBasedParse(text)
-      return { ...result, parseEngine: 'rule' }
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as ParseResult
-
-    // 清理和优化搜索关键词
-    const cleanedItems = parsed.items.map(item => ({
-      ...item,
-      searchKeyword: cleanSearchKeyword(item.searchKeyword, item.name, item.category)
-    }))
-
-    return {
-      items: cleanedItems,
-      warnings: parsed.warnings || [],
-      parseEngine: 'deepseek',
-    }
-  } catch (error) {
-    console.error('DeepSeek 解析异常:', error)
-    // 超时或网络错误时自动降级
-    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
-      console.warn('DeepSeek API 超时（15秒），自动降级到规则引擎')
-    }
-    const result = ruleBasedParse(text)
-    return { ...result, parseEngine: 'rule' }
   }
+
+  if (envApiKey && envApiKey !== userApiKey) {
+    candidates.push({
+      apiKey: envApiKey,
+      baseUrl: defaultBaseUrl,
+      source: 'env',
+    })
+  }
+
+  if (candidates.length === 0) {
+    console.warn('DeepSeek API key is missing in both user config and env, fallback to rule parser')
+    return { ...fallbackResult, parseEngine: 'rule' }
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const response = await fetch(`${candidate.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${candidate.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            { role: 'system', content: BOM_SYSTEM_PROMPT },
+            { role: 'user', content: text },
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.1,
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error(`DeepSeek API request failed (${candidate.source}):`, response.status, errText)
+        continue
+      }
+
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content
+
+      if (!content) {
+        console.error(`DeepSeek response content is empty (${candidate.source})`)
+        continue
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        console.error(`DeepSeek response does not contain JSON (${candidate.source}):`, content)
+        continue
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as ParseResult
+      const cleanedItems = parsed.items.map(item => ({
+        ...item,
+        searchKeyword: cleanSearchKeyword(item.searchKeyword, item.name, item.category),
+      }))
+
+      return {
+        items: cleanedItems,
+        warnings: parsed.warnings || [],
+        parseEngine: 'deepseek',
+      }
+    } catch (error) {
+      console.error(`DeepSeek parse exception (${candidate.source}):`, error)
+      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+        console.warn(`DeepSeek request timeout (${candidate.source}), trying next candidate or fallback`)
+      }
+    }
+  }
+
+  return { ...fallbackResult, parseEngine: 'rule' }
 }
 
 /**
@@ -163,10 +178,18 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 30))
 
   const maxTokens = Math.max(512, Math.min(3072, 256 + estimatedItems * 40))
-  const timeoutMs = Math.max(15000, Math.min(30000, 10000 + estimatedItems * 320))
+  const timeoutMs = Math.max(9000, Math.min(18000, 7000 + estimatedItems * 160))
 
   return { maxTokens, timeoutMs }
 }
+
+function normalizeBaseUrl(baseUrl?: string): string | undefined {
+  if (!baseUrl) return undefined
+  const trimmed = baseUrl.trim()
+  if (!trimmed) return undefined
+  return trimmed.replace(/\/$/, '')
+}
+
 
 /**
  * Extract trailing quantity from formats like x2, ×2, 2pcs, 2个, or " ... 2".
@@ -275,7 +298,7 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
   let cleaned = keyword.trim()
 
   // 0. 移除 Excel 解析时的标记和数量后缀
-  cleaned = cleaned.replace(/[封装封裝]$/g, '') // 移除末尾的"封装"字样
+  cleaned = cleaned.replace(/(?:\u5C01\u88C5|\u5C01\u88DD)$/g, '') // remove trailing package suffix
   cleaned = cleaned.replace(/\s+x\d*\s*$/i, '') // 移除末尾的 x2, x10, 或单独的 x
   cleaned = cleaned.trim()
 
