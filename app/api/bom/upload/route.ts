@@ -77,8 +77,12 @@ export async function POST(req: NextRequest) {
     const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
     await ensureAiModelColumn()
     const sql = getSql()
-    const userRows = await sql`SELECT bom_api_key, bom_base_url FROM users WHERE id = ${authResult.user.id}`
-    const bomConfig = userRows.length > 0 ? { apiKey: (userRows[0] as any).bom_api_key, baseUrl: (userRows[0] as any).bom_base_url } : undefined
+    const userRows = await sql`SELECT bom_api_key, bom_base_url, ai_model FROM users WHERE id = ${authResult.user.id}`
+    const bomConfig = userRows.length > 0 ? {
+      apiKey: (userRows[0] as any).bom_api_key,
+      baseUrl: (userRows[0] as any).bom_base_url,
+      model: /deepseek/i.test((userRows[0] as any).ai_model || '') ? (userRows[0] as any).ai_model : undefined,
+    } : undefined
 
     // AI 解析提取的文本
     const parseResult = await parseBomText(extractedText, bomConfig)

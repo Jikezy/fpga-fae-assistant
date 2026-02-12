@@ -38,11 +38,15 @@ const BOM_SYSTEM_PROMPT = `你是电子元器件 BOM 解析专家。将文本解
  * 使用 DeepSeek AI 解析 BOM 文本
  * 优先用用户自己的 DeepSeek 配置，回退到系统环境变量，最后降级规则解析
  */
-export async function parseBomText(text: string, userConfig?: { apiKey?: string; baseUrl?: string }): Promise<ParseResult> {
+export async function parseBomText(
+  text: string,
+  userConfig?: { apiKey?: string; baseUrl?: string; model?: string }
+): Promise<ParseResult> {
   const userApiKey = userConfig?.apiKey?.trim()
   const envApiKey = process.env.DEEPSEEK_API_KEY?.trim()
   const userBaseUrl = normalizeBaseUrl(userConfig?.baseUrl)
   const defaultBaseUrl = 'https://api.deepseek.com'
+  const modelCandidates = buildModelCandidates(userConfig?.model, process.env.DEEPSEEK_MODEL)
   const { maxTokens, timeoutMs } = getDynamicAiBudget(text)
   const fallbackResult = ruleBasedParse(text)
 
@@ -69,66 +73,100 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
   let lastErrorReason = ''
 
   for (const candidate of candidates) {
-    try {
-      const response = await fetch(`${candidate.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${candidate.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            { role: 'system', content: BOM_SYSTEM_PROMPT },
-            { role: 'user', content: text },
-          ],
-          max_tokens: maxTokens,
-          temperature: 0.1,
-          response_format: { type: 'json_object' },
-        }),
-        signal: AbortSignal.timeout(timeoutMs),
-      })
+    const endpoints = buildCompletionEndpointCandidates(candidate.baseUrl)
+    let candidateBlocked = false
 
-      if (!response.ok) {
-        const errText = await response.text()
-        lastErrorReason = `api_${response.status}_${candidate.source}`
-        console.error(`DeepSeek API request failed (${candidate.source}):`, response.status, errText)
-        continue
+    for (const endpoint of endpoints) {
+      for (const model of modelCandidates) {
+        const modelTag = sanitizeModelName(model)
+
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${candidate.apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [
+                { role: 'system', content: BOM_SYSTEM_PROMPT },
+                { role: 'user', content: text },
+              ],
+              max_tokens: maxTokens,
+              temperature: 0.1,
+              response_format: { type: 'json_object' },
+            }),
+            signal: AbortSignal.timeout(timeoutMs),
+          })
+
+          if (!response.ok) {
+            const errText = await response.text()
+            lastErrorReason = classifyApiFailure(response.status, errText, candidate.source, modelTag)
+            console.error(
+              `DeepSeek API request failed (${candidate.source}):`,
+              response.status,
+              `model=${model}`,
+              `endpoint=${endpoint}`,
+              errText
+            )
+
+            if (response.status === 401 || response.status === 403) {
+              candidateBlocked = true
+              break
+            }
+
+            if (isModelNotSupported(response.status, errText)) {
+              continue
+            }
+
+            if (isLikelyEndpointMismatch(response.status, errText)) {
+              break
+            }
+
+            candidateBlocked = true
+            break
+          }
+
+          const data = await response.json()
+          const content = extractMessageText(data?.choices?.[0]?.message?.content)
+
+          if (!content) {
+            lastErrorReason = `empty_content_${candidate.source}_${modelTag}`
+            console.error(`DeepSeek response content is empty (${candidate.source}, model=${model})`)
+            continue
+          }
+
+          const payload = extractJsonPayload(content)
+          if (!payload) {
+            lastErrorReason = `json_extract_failed_${candidate.source}_${modelTag}`
+            console.error(`DeepSeek response does not contain valid JSON (${candidate.source}, model=${model})`)
+            continue
+          }
+
+          const parsed = normalizeAiResponse(payload)
+          if (parsed.items.length === 0) {
+            lastErrorReason = `no_items_${candidate.source}_${modelTag}`
+            console.error(`DeepSeek response has no valid items (${candidate.source}, model=${model})`)
+            continue
+          }
+
+          return {
+            items: parsed.items,
+            warnings: parsed.warnings,
+            parseEngine: 'deepseek',
+          }
+        } catch (error) {
+          lastErrorReason = `exception_${candidate.source}_${modelTag}`
+          console.error(`DeepSeek parse exception (${candidate.source}, model=${model}):`, error)
+          if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+            lastErrorReason = `timeout_${candidate.source}_${modelTag}`
+          }
+        }
       }
 
-      const data = await response.json()
-      const content = data?.choices?.[0]?.message?.content
-
-      if (typeof content !== 'string' || !content.trim()) {
-        lastErrorReason = `empty_content_${candidate.source}`
-        console.error(`DeepSeek response content is empty (${candidate.source})`)
-        continue
-      }
-
-      const payload = extractJsonPayload(content)
-      if (!payload) {
-        lastErrorReason = `json_extract_failed_${candidate.source}`
-        console.error(`DeepSeek response does not contain valid JSON (${candidate.source})`)
-        continue
-      }
-
-      const parsed = normalizeAiResponse(payload)
-      if (parsed.items.length === 0) {
-        lastErrorReason = `no_items_${candidate.source}`
-        console.error(`DeepSeek response has no valid items (${candidate.source})`)
-        continue
-      }
-
-      return {
-        items: parsed.items,
-        warnings: parsed.warnings,
-        parseEngine: 'deepseek',
-      }
-    } catch (error) {
-      lastErrorReason = `exception_${candidate.source}`
-      console.error(`DeepSeek parse exception (${candidate.source}):`, error)
-      if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
-        lastErrorReason = `timeout_${candidate.source}`
+      if (candidateBlocked) {
+        break
       }
     }
   }
@@ -140,43 +178,166 @@ export async function parseBomText(text: string, userConfig?: { apiKey?: string;
   return { ...fallbackResult, parseEngine: 'rule' }
 }
 
-function extractJsonPayload(content: string): unknown | null {
-  const trimmed = content.trim()
+function buildModelCandidates(preferredModel?: string, envModel?: string): string[] {
+  const queue = [
+    preferredModel,
+    envModel,
+    'deepseek-chat',
+    'deepseek-v3.2',
+    'DeepSeek-V3.2',
+    'deepseek-ai/DeepSeek-V3.2',
+    'deepseek-v3',
+    'deepseek-ai/DeepSeek-V3',
+  ]
 
-  try {
-    return JSON.parse(trimmed)
-  } catch {
-    // continue
+  const unique: string[] = []
+  const seen = new Set<string>()
+
+  for (const raw of queue) {
+    const value = raw?.trim()
+    if (!value) continue
+
+    const key = value.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    unique.push(value)
   }
+
+  return unique
+}
+
+function sanitizeModelName(model: string): string {
+  const normalized = model.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  return normalized || 'default-model'
+}
+
+function buildCompletionEndpointCandidates(baseUrl: string): string[] {
+  const normalized = baseUrl.replace(/\/+$/, '')
+  const candidates = [`${normalized}/chat/completions`]
+
+  if (!/\/v\d+$/i.test(normalized)) {
+    candidates.push(`${normalized}/v1/chat/completions`)
+  }
+
+  return Array.from(new Set(candidates))
+}
+
+function classifyApiFailure(status: number, errText: string, source: string, modelTag: string): string {
+  if (status === 401 || status === 403) {
+    return `auth_${status}_${source}`
+  }
+
+  if (isModelNotSupported(status, errText)) {
+    return `model_invalid_${source}_${modelTag}`
+  }
+
+  if (isLikelyEndpointMismatch(status, errText)) {
+    return `endpoint_${status}_${source}`
+  }
+
+  return `api_${status}_${source}_${modelTag}`
+}
+
+function isModelNotSupported(status: number, errText: string): boolean {
+  if (![400, 404, 422].includes(status)) return false
+
+  const normalized = errText.toLowerCase()
+  return (
+    /model/.test(normalized) && /invalid|unsupported|unknown|not\s*found|does\s*not\s*exist/.test(normalized)
+  ) || /model_not_found/.test(normalized)
+}
+
+function isLikelyEndpointMismatch(status: number, errText: string): boolean {
+  if (status === 404 || status === 405) return true
+  if (status !== 400) return false
+
+  const normalized = errText.toLowerCase()
+  return /invalid\s*url|route\s*not\s*found|path\s*not\s*found|unknown\s*endpoint/.test(normalized)
+}
+
+function extractMessageText(content: unknown): string {
+  if (typeof content === 'string') {
+    return content.trim()
+  }
+
+  if (Array.isArray(content)) {
+    const chunks = content
+      .map(part => {
+        if (typeof part === 'string') return part
+        if (!isRecord(part)) return ''
+        if (typeof part.text === 'string') return part.text
+        if (typeof part.content === 'string') return part.content
+        return ''
+      })
+      .filter(Boolean)
+
+    return chunks.join('\n').trim()
+  }
+
+  if (isRecord(content)) {
+    if (typeof content.text === 'string') return content.text.trim()
+    if (typeof content.content === 'string') return content.content.trim()
+  }
+
+  return ''
+}
+
+function extractJsonPayload(content: string): unknown | null {
+  const candidates: string[] = []
+  const seen = new Set<string>()
+
+  const pushCandidate = (value?: string) => {
+    if (!value) return
+    const trimmed = value.trim()
+    if (!trimmed || seen.has(trimmed)) return
+    seen.add(trimmed)
+    candidates.push(trimmed)
+  }
+
+  const trimmed = content.trim()
+  pushCandidate(trimmed)
 
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
-  if (fenced?.[1]) {
-    try {
-      return JSON.parse(fenced[1])
-    } catch {
-      // continue
-    }
-  }
+  pushCandidate(fenced?.[1])
 
   const objectLike = trimmed.match(/\{[\s\S]*\}/)
-  if (objectLike?.[0]) {
-    try {
-      return JSON.parse(objectLike[0])
-    } catch {
-      // continue
-    }
-  }
+  pushCandidate(objectLike?.[0])
 
   const arrayLike = trimmed.match(/\[[\s\S]*\]/)
-  if (arrayLike?.[0]) {
-    try {
-      return JSON.parse(arrayLike[0])
-    } catch {
-      // continue
-    }
+  pushCandidate(arrayLike?.[0])
+
+  for (const candidate of candidates) {
+    const parsed = tryParseJsonCandidate(candidate)
+    if (parsed !== null) return parsed
   }
 
   return null
+}
+
+function tryParseJsonCandidate(candidate: string): unknown | null {
+  const direct = tryJsonParse(candidate)
+  if (direct !== null) return direct
+
+  const relaxed = candidate
+    .replace(/^\uFEFF+/, '')
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1')
+
+  if (relaxed !== candidate) {
+    const parsed = tryJsonParse(relaxed)
+    if (parsed !== null) return parsed
+  }
+
+  return null
+}
+
+function tryJsonParse(value: string): unknown | null {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
 }
 
 function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: string[] } {
@@ -268,13 +429,20 @@ function pickFirstNumber(source: Record<string, unknown>, keys: string[]): numbe
   return undefined
 }
 
-function findArrayLikeValue(source: Record<string, unknown>): unknown[] | null {
-  for (const value of Object.values(source)) {
-    if (!Array.isArray(value) || value.length === 0) continue
+function findArrayLikeValue(source: Record<string, unknown>, depth = 0): unknown[] | null {
+  if (depth > 3) return null
 
-    const first = value[0]
-    if (isRecord(first) || typeof first === 'string') {
-      return value
+  for (const value of Object.values(source)) {
+    if (Array.isArray(value) && value.length > 0) {
+      const first = value[0]
+      if (isRecord(first) || typeof first === 'string') {
+        return value
+      }
+    }
+
+    if (isRecord(value)) {
+      const nested = findArrayLikeValue(value, depth + 1)
+      if (nested) return nested
     }
   }
 
@@ -337,10 +505,10 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
     .split(/[\n;]/)
     .map(line => line.trim())
     .filter(Boolean).length
-  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 30))
+  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 28))
 
-  const maxTokens = Math.max(512, Math.min(3072, 256 + estimatedItems * 40))
-  const timeoutMs = Math.max(10000, Math.min(25000, 8000 + estimatedItems * 180))
+  const maxTokens = Math.max(768, Math.min(4096, 384 + estimatedItems * 52))
+  const timeoutMs = Math.max(9000, Math.min(30000, 7500 + estimatedItems * 220))
 
   return { maxTokens, timeoutMs }
 }
@@ -349,7 +517,7 @@ function normalizeBaseUrl(baseUrl?: string): string | undefined {
   if (!baseUrl) return undefined
   const trimmed = baseUrl.trim()
   if (!trimmed) return undefined
-  return trimmed.replace(/\/$/, '')
+  return trimmed.replace(/\/+$/, '')
 }
 
 
@@ -460,8 +628,8 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
   let cleaned = keyword.trim()
 
   // 0. 移除 Excel 解析时的标记和数量后缀
-  cleaned = cleaned.replace(/(?:\u5C01\u88C5|\u5C01\u88DD)$/g, '') // remove trailing package suffix
-  cleaned = cleaned.replace(/\s+x\d*\s*$/i, '') // 移除末尾的 x2, x10, 或单独的 x
+  cleaned = cleaned.replace(/(?:\u5C01\u88C5|\u5C01\u88DD|\u5C01)$/g, '') // remove trailing package suffix
+  cleaned = cleaned.replace(/\s*[x\u00D7*]\s*\d*\s*$/i, '') // remove trailing quantity markers
   cleaned = cleaned.trim()
 
   // 1. 移除 EDA 软件生成的库代码前缀（但保留封装类型）
@@ -525,7 +693,7 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
 
     // 移除封装后缀（通常在空格或下划线后）
     // 例如：STM32H750VBT6 LQFP100 → STM32H750VBT6
-    cleaned = cleaned.replace(/[\s_]+([LQFP|QFP|BGA|SOT|SOP|DIP|SOIC]+[-\d]+)$/i, '')
+    cleaned = cleaned.replace(/[\s_]+((?:LQFP|QFP|TQFP|QFN|BGA|SOT|SOD|SOP|DIP|SOIC)-?\d+)$/i, '')
 
     cleaned = cleaned.trim()
   }
@@ -575,7 +743,7 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
     .trim()
 
   // 5. 如果清理后为空或太短，使用原名称
-  if (cleaned.length < 2) {
+  if (cleaned.length < 2 || /^[\W_.-]+$/.test(cleaned) || /^\.?\d+(?:\.\d+)?$/.test(cleaned)) {
     cleaned = name.split(/[_\-\s]/)[0] // 取第一个单词
   }
 
@@ -585,5 +753,10 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
     cleaned = cleaned.substring(0, 30)
   }
 
+
+  cleaned = cleaned
+    .replace(/(?:\u5C01\u88C5|\u5C01\u88DD|\u5C01)$/g, '')
+    .replace(/\s*[x\u00D7*]\s*$/i, '')
+    .trim()
   return cleaned
 }
