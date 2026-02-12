@@ -132,26 +132,29 @@ function ruleBasedParse(text: string): ParseResult {
       const name = match[1]
       const spec = match[2]?.trim() || ''
       const quantity = match[3] ? parseInt(match[3]) : 1
+      const category = inferCategory(name, spec)
+      const rawKeyword = name + (spec ? ' ' + spec : '')
 
       items.push({
         name,
         spec,
         quantity,
-        searchKeyword: name + (spec ? ' ' + spec : ''),
-        category: inferCategory(name, spec),
+        searchKeyword: cleanSearchKeyword(rawKeyword, name, category),
+        category,
       })
     } else {
       // 如果格式不匹配，整行作为一个元器件
       const qty = trimmed.match(/\d+\s*$/)?.[0]
       const qtyNum = qty ? parseInt(qty) : 1
       const nameSpec = qty ? trimmed.slice(0, -qty.length).trim() : trimmed
+      const category = inferCategory(nameSpec, '')
 
       items.push({
         name: nameSpec,
         spec: '',
         quantity: qtyNum,
-        searchKeyword: nameSpec,
-        category: inferCategory(nameSpec, ''),
+        searchKeyword: cleanSearchKeyword(nameSpec, nameSpec, category),
+        category,
       })
 
       warnings.push(`无法准确解析: ${trimmed}`)
@@ -192,6 +195,11 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
 
   let cleaned = keyword.trim()
 
+  // 0. 移除 Excel 解析时添加的标记：[封装:xxx] 和 x数量
+  cleaned = cleaned.replace(/\[封装[：:][^\]]*\]/g, '') // 移除 [封装:0805]
+  cleaned = cleaned.replace(/\s*x\d+\s*$/i, '') // 移除末尾的 x2, x10 等
+  cleaned = cleaned.trim()
+
   // 1. 移除 EDA 软件生成的库代码前缀（但保留封装类型）
   // 例如：SW-TH_4P-L6.0-W6.0 → 保留有用部分，去掉尺寸
   cleaned = cleaned
@@ -216,15 +224,15 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
     if (valueMatch) {
       const value = valueMatch[1]
       let unit = valueMatch[2]?.toUpperCase() || 'R'
-      // 转换为中文电商常用格式：R→欧姆，K保持，Ω→K
+      // 转换为中文电商常用格式
       if (unit === 'Ω' || unit === 'OHM') unit = 'R'
       if (unit === 'R' && parseFloat(value) >= 1000) {
         // 1000R 及以上转换为 K
         const kValue = parseFloat(value) / 1000
-        cleaned = pkg ? `贴片电阻 ${kValue}K ${pkg}` : `${kValue}K电阻`
+        cleaned = pkg ? `${pkg} ${kValue}K电阻` : `${kValue}K电阻`
       } else {
-        // SMD 封装加"贴片"前缀
-        cleaned = pkg ? `贴片电阻 ${value}${unit} ${pkg}` : `${value}${unit}电阻`
+        // 封装号在前面：0805 10K电阻
+        cleaned = pkg ? `${pkg} ${value}${unit}电阻` : `${value}${unit}电阻`
       }
     } else if (!/电阻|res/.test(lowerKeyword)) {
       cleaned = `${cleaned} 电阻`.trim()
@@ -239,20 +247,23 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
     if (valueMatch) {
       const value = valueMatch[1]
       const unit = valueMatch[2]?.toLowerCase() || ''
-      // SMD 封装加"贴片"前缀
-      cleaned = pkg ? `贴片电容 ${value}${unit}F ${pkg}` : `${value}${unit}F电容`
+      // 封装号在前面：0805 10uF电容
+      cleaned = pkg ? `${pkg} ${value}${unit}F电容` : `${value}${unit}F电容`
     } else if (!/电容|cap/.test(lowerKeyword)) {
       cleaned = `${cleaned} 电容`.trim()
     }
   }
 
-  // 芯片：保留型号和封装
+  // 芯片：只保留主型号，去掉所有封装信息
   else if (category === '芯片') {
-    // 提取主型号（通常是字母数字组合）
-    const chipModel = cleaned.split(/[\s_-]/)[0]
-    const pkg = packageMatch ? packageMatch[0] : ''
+    // 提取主型号（去掉封装和库代码）
+    // 例如：ML307C-DC-CN → ML307C，STM32F103C8T6 → STM32F103C8T6
+    const parts = cleaned.split(/[\s_]/)[0] // 先按空格/下划线分割，取第一部分
+    // 对于连字符，只在特定情况下分割（如 SW-TH, LCC-LGA 等库代码前缀）
+    const mainModel = parts.replace(/^(SW-TH|LCC-LGA)-?/gi, '')
 
-    cleaned = `${chipModel}${pkg ? ' ' + pkg : ''}`
+    // 只保留型号，不加封装
+    cleaned = mainModel
   }
 
   // 连接器：简化为通用名称，但保留类型
