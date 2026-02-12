@@ -16,12 +16,11 @@ export async function DELETE(req: NextRequest) {
     const sql = getSql()
 
     // 清除所有过期或需要重新搜索的缓存
-    const result = await sql`DELETE FROM price_cache WHERE platform = 'taobao'`
+    await sql`DELETE FROM price_cache WHERE platform = 'taobao'`
 
     return NextResponse.json({
       success: true,
       message: '缓存已清除，请重新搜索',
-      deletedCount: result.count || 0,
     })
   } catch (error) {
     console.error('清除缓存错误:', error)
