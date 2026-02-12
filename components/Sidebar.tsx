@@ -100,6 +100,9 @@ export default function Sidebar({ isOpen, onToggle, onFullRead }: SidebarProps) 
               <p>💡 支持的文档格式：PDF</p>
               <p>🔒 数据本地存储，安全可靠</p>
             </div>
+            <a href="mailto:3082463315@qq.com" className="block mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+              投诉举报：3082463315@qq.com
+            </a>
           </div>
         </div>
       </aside>

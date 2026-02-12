@@ -331,9 +331,15 @@ export default function LandingPage() {
           <div className="text-center text-gray-600">
             <p className="mb-2">© 2026 FPGA FAE助手. All rights reserved.</p>
             <p className="text-sm mb-1">Powered by Claude Opus 4 × Neon PostgreSQL</p>
-            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-              鄂ICP备2026007985号
-            </a>
+            <div className="flex items-center justify-center gap-3 mt-2">
+              <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                鄂ICP备2026007985号
+              </a>
+              <span className="text-xs text-gray-300">|</span>
+              <a href="mailto:3082463315@qq.com" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                投诉举报：3082463315@qq.com
+              </a>
+            </div>
           </div>
         </footer>
       </div>

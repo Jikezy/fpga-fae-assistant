@@ -273,9 +273,15 @@ export default function RegisterPage() {
           <p className="text-sm text-gray-500">
             © 2026 FPGA FAE助手 - 木叶技术部
           </p>
-          <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-500 transition-colors">
-            鄂ICP备2026007985号
-          </a>
+          <div className="flex items-center justify-center gap-2 mt-1">
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-500 transition-colors">
+              鄂ICP备2026007985号
+            </a>
+            <span className="text-xs text-gray-300">|</span>
+            <a href="mailto:3082463315@qq.com" className="text-xs text-gray-400 hover:text-gray-500 transition-colors">
+              投诉举报
+            </a>
+          </div>
         </motion.div>
       </motion.div>
     </div>
