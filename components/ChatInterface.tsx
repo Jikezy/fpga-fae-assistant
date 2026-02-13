@@ -340,30 +340,30 @@ export default function ChatInterface({ fullReadRequest, onFullReadComplete }: C
         <div className="flex-1 flex items-center justify-center px-4 overflow-y-auto">
           <div className="text-center max-w-2xl mx-auto py-8">
             {/* Logo */}
-            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-[0_8px_30px_rgba(124,58,237,0.3)]">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-[0_10px_28px_rgba(171,64,17,0.35)]">
               <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+            <h2 className="text-2xl sm:text-3xl font-bold text-orange-950 mb-2">
               FPGA FAE 智能助手
             </h2>
 
             {isConfigured === null ? (
-              <p className="text-gray-500 mb-8">正在检查配置...</p>
+              <p className="text-orange-900/70 mb-8">正在检查配置...</p>
             ) : isConfigured ? (
               <>
-                <p className="text-gray-500 mb-8">有什么我可以帮您的？试试下面的问题，或直接输入您的问题。</p>
+                <p className="text-orange-900/70 mb-8">有什么我可以帮您的？试试下面的问题，或直接输入您的问题。</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mx-auto">
                   {suggestions.map((s, i) => (
                     <button
                       key={i}
                       onClick={() => handleSendMessage(s.text)}
-                      className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] border border-gray-200/60 rounded-2xl text-left text-sm text-gray-700 hover:border-purple-300 hover:shadow-[0_8px_30px_rgba(124,58,237,0.1)] transition-all group"
+                      className="flex items-center gap-3 px-4 py-3 bg-gradient-to-br from-white/90 to-orange-50/80 backdrop-blur-[60px] border border-orange-200/70 rounded-2xl text-left text-sm text-orange-900/85 hover:border-orange-300 hover:shadow-[0_10px_30px_rgba(171,64,17,0.14)] transition-all group"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0 group-hover:bg-purple-100 transition-colors">
-                        <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0 group-hover:bg-orange-100 transition-colors">
+                        <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={s.icon} />
                         </svg>
                       </div>
@@ -374,10 +374,10 @@ export default function ChatInterface({ fullReadRequest, onFullReadComplete }: C
               </>
             ) : (
               <>
-                <p className="text-gray-500 mb-6">请先配置 AI 服务后开始使用</p>
+                <p className="text-orange-900/70 mb-6">请先配置 AI 服务后开始使用</p>
                 <button
                   onClick={() => router.push('/settings')}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold rounded-2xl shadow-[0_8px_30px_rgba(124,58,237,0.4)] hover:shadow-[0_12px_40px_rgba(124,58,237,0.5)] transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white font-semibold rounded-2xl shadow-[0_10px_30px_rgba(171,64,17,0.36)] hover:shadow-[0_14px_40px_rgba(171,64,17,0.44)] transition-all"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -402,7 +402,7 @@ export default function ChatInterface({ fullReadRequest, onFullReadComplete }: C
       )}
 
       {/* 输入框 */}
-      <div className="border-t border-white/10">
+      <div className="border-t border-orange-200/50">
         <ChatInput
           onSend={handleSendMessage}
           disabled={isLoading}

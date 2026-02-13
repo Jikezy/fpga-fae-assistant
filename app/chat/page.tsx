@@ -13,28 +13,18 @@ export default function Home() {
 
   return (
     <PageTransition transitionKey="home">
-      <div className="flex h-screen relative overflow-hidden">
-        {/* 3D Liquid Glass Background */}
+      <div className="relative flex h-screen overflow-hidden">
         <LiquidGlassBackground />
+        <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_12%_10%,rgba(245,123,32,0.17),transparent_38%),radial-gradient(circle_at_85%_12%,rgba(187,35,45,0.16),transparent_34%)]" />
 
-        {/* Subtle gradient overlay for better contrast */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-100/15 via-transparent to-gray-100/15 z-0" />
-
-        {/* 侧边栏 */}
         <Sidebar
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
           onFullRead={(filename) => setFullReadRequest(filename)}
         />
 
-        {/* 主内容区 */}
-        <div className="flex-1 flex flex-col overflow-hidden relative z-20">
-          {/* 顶部导航 */}
-          <Header
-            onMenuClick={() => setSidebarOpen(!sidebarOpen)}
-          />
-
-          {/* 聊天界面 */}
+        <div className="relative z-20 flex flex-1 flex-col overflow-hidden">
+          <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
           <main className="flex-1 overflow-hidden">
             <ChatInterface
               fullReadRequest={fullReadRequest}

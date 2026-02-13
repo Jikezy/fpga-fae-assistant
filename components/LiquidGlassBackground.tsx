@@ -116,11 +116,11 @@ export default function LiquidGlassBackground() {
       uniform vec2 uResolution;
 
       // Clean & Airy - 影棚柔光配色（清澈水晶感）
-      vec3 color1 = vec3(0.95, 0.96, 0.98); // 乳白色 #f2f4f9
-      vec3 color2 = vec3(0.88, 0.91, 0.95); // 银白色 #e1e8f2
-      vec3 color3 = vec3(0.82, 0.87, 0.93); // 高级灰 #d1dded
-      vec3 color4 = vec3(0.70, 0.85, 0.95); // 淡雅冰蓝 #b3d9f2
-      vec3 color5 = vec3(0.60, 0.75, 0.88); // 水晶蓝 #99bfe0
+      vec3 color1 = vec3(0.99, 0.95, 0.88); // 乳白色 #f2f4f9
+      vec3 color2 = vec3(0.98, 0.86, 0.68); // 银白色 #e1e8f2
+      vec3 color3 = vec3(0.94, 0.62, 0.37); // 高级灰 #d1dded
+      vec3 color4 = vec3(0.84, 0.24, 0.20); // 淡雅冰蓝 #b3d9f2
+      vec3 color5 = vec3(0.95, 0.74, 0.24); // 水晶蓝 #99bfe0
 
       // Simplex noise for smooth gradients
       float hash(vec2 p) {
@@ -180,11 +180,11 @@ export default function LiquidGlassBackground() {
 
         // 水晶焦散（轻微点缀）
         float causticsPattern = caustic(distortedUv, uTime);
-        color += color4 * causticsPattern * 0.15;
+        color += color4 * causticsPattern * 0.12;
 
         // 柔和的边缘光晕（影棚柔光效果）
         float edgeGlow = smoothstep(0.0, 0.5, length(uv - center)) * 0.2;
-        color = mix(color, vec3(0.92, 0.94, 0.97), edgeGlow);
+        color = mix(color, vec3(0.99, 0.90, 0.74), edgeGlow);
 
         // 极微弱的鼠标交互（不干扰视觉）
         vec2 mouseUv = (uMouse + 1.0) * 0.5;
@@ -193,7 +193,7 @@ export default function LiquidGlassBackground() {
         color += color5 * mouseGlow;
 
         // 保持高亮度（影棚光感）
-        color = clamp(color, 0.85, 1.0);
+        color = clamp(color, 0.58, 1.0);
 
         gl_FragColor = vec4(color, 1.0);
       }

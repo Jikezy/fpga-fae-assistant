@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'AI 智能助手 - FPGA技术咨询 & BOM智能采购',
-  description: '基于Claude AI的智能助手平台，提供FPGA技术咨询和电子元器件BOM智能采购服务',
+  title: 'AI 智能助手 - FPGA 技术咨询与 BOM 采购',
+  description: '面向硬件工程团队的 AI 平台，支持技术问答、文档检索和 BOM 智能采购。',
 }
 
 export default function RootLayout({
@@ -13,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="font-sans">{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   )
 }

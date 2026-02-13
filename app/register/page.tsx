@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import LiquidGlassBackground from '@/components/LiquidGlassBackground'
 import { motion } from 'framer-motion'
+import LiquidGlassBackground from '@/components/LiquidGlassBackground'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -19,12 +19,11 @@ export default function RegisterPage() {
     setError('')
 
     if (password !== confirmPassword) {
-      setError('两次输入的密码不一致')
+      setError('两次输入的密码不一致。')
       return
     }
 
     setLoading(true)
-
     try {
       const response = await fetch('/api/auth/register', {
         method: 'POST',
@@ -33,256 +32,108 @@ export default function RegisterPage() {
       })
 
       const data = await response.json()
-
       if (response.ok) {
         router.push('/chat')
         router.refresh()
       } else {
-        setError(data.error || '注册失败')
+        setError(data.error || '注册失败，请稍后重试。')
       }
-    } catch (err) {
-      setError('网络错误，请稍后重试')
+    } catch {
+      setError('网络异常，请稍后重试。')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
       <LiquidGlassBackground />
-      <div className="absolute inset-0 bg-gradient-to-br from-orange-50/20 via-transparent to-purple-100/20 z-0" />
-
-      {/* 装饰性漂浮云朵 */}
-      <motion.div
-        animate={{ x: [0, 25, 0], y: [0, -8, 0] }}
-        transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute top-[12%] right-[8%] z-0 opacity-20"
-      >
-        <svg width="110" height="45" viewBox="0 0 120 50" fill="none">
-          <ellipse cx="60" cy="30" rx="55" ry="18" fill="url(#rcloud1)" />
-          <ellipse cx="35" cy="25" rx="30" ry="22" fill="url(#rcloud1)" />
-          <ellipse cx="85" cy="25" rx="30" ry="20" fill="url(#rcloud1)" />
-          <defs><linearGradient id="rcloud1" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#a855f7"/><stop offset="1" stopColor="#f97316"/></linearGradient></defs>
-        </svg>
-      </motion.div>
-      <motion.div
-        animate={{ x: [0, -18, 0], y: [0, 6, 0] }}
-        transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute bottom-[18%] left-[8%] z-0 opacity-15"
-      >
-        <svg width="90" height="36" viewBox="0 0 100 40" fill="none">
-          <ellipse cx="50" cy="24" rx="45" ry="14" fill="url(#rcloud2)" />
-          <ellipse cx="30" cy="20" rx="25" ry="18" fill="url(#rcloud2)" />
-          <ellipse cx="70" cy="20" rx="25" ry="16" fill="url(#rcloud2)" />
-          <defs><linearGradient id="rcloud2" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#f97316"/><stop offset="1" stopColor="#a855f7"/></linearGradient></defs>
-        </svg>
-      </motion.div>
-
-      {/* 装饰性手里剑 */}
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
-        className="absolute bottom-[25%] right-[12%] z-0 opacity-10"
-      >
-        <svg width="50" height="50" viewBox="0 0 60 60" fill="none">
-          <path d="M30 0L35 25L60 30L35 35L30 60L25 35L0 30L25 25Z" fill="#a855f7" />
-        </svg>
-      </motion.div>
-      <motion.div
-        animate={{ rotate: -360 }}
-        transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-        className="absolute top-[28%] left-[10%] z-0 opacity-8"
-      >
-        <svg width="35" height="35" viewBox="0 0 60 60" fill="none">
-          <path d="M30 0L35 25L60 30L35 35L30 60L25 35L0 30L25 25Z" fill="#f97316" />
-        </svg>
-      </motion.div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_14%,rgba(245,123,32,0.24),transparent_36%),radial-gradient(circle_at_16%_84%,rgba(187,35,45,0.2),transparent_30%)]" />
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="w-full max-w-md relative z-10"
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.55, ease: [0.2, 1, 0.35, 1] }}
+        className="naruto-glass relative z-10 w-full max-w-md rounded-[2rem] p-6 sm:p-8"
       >
-        <div className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.8)] p-5 sm:p-8 border border-gray-200/60 relative overflow-hidden">
-          {/* 卡片内漩涡纹装饰 */}
-          <div className="absolute -top-16 -right-16 w-32 h-32 opacity-[0.04]">
-            <svg viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="45" stroke="#f97316" strokeWidth="3" />
-              <path d="M50 5C50 5 80 20 80 50C80 80 50 80 50 50C50 30 35 25 50 5Z" fill="#f97316" />
+        <div className="mb-7 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 text-white shadow-[0_12px_26px_rgba(171,64,17,0.38)]">
+            <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <div className="absolute -bottom-12 -left-12 w-24 h-24 opacity-[0.04]">
-            <svg viewBox="0 0 100 100" fill="none">
-              <circle cx="50" cy="50" r="45" stroke="#a855f7" strokeWidth="3" />
-              <path d="M50 5C50 5 80 20 80 50C80 80 50 80 50 50C50 30 35 25 50 5Z" fill="#a855f7" />
-            </svg>
-          </div>
-
-          {/* Logo */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="text-center mb-8 relative"
-          >
-            <div className="relative inline-block">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full mb-4 shadow-[0_8px_30px_rgba(124,58,237,0.35)] ring-2 ring-purple-200 border border-purple-300">
-                <svg className="w-10 h-10 text-white" viewBox="0 0 48 48" fill="currentColor">
-                  <path d="M24 4C24 4 36 12 36 24C36 36 24 40 24 40C24 40 12 36 12 24C12 12 24 4 24 4Z" fillOpacity="0.9"/>
-                  <path d="M24 10C24 10 32 16 32 24C32 32 24 36 24 36" stroke="rgba(255,255,255,0.6)" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                  <line x1="24" y1="14" x2="24" y2="38" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
-                </svg>
-              </div>
-              <motion.div
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-28 h-1 bg-gradient-to-r from-transparent via-purple-400 to-transparent rounded-full"
-              />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-800 mt-2">FPGA FAE助手</h1>
-            <p className="text-gray-500 mt-1.5 text-sm flex items-center justify-center gap-1.5">
-              <span className="inline-block w-3 h-[2px] bg-purple-300 rounded-full"></span>
-              注册成为新忍者
-              <span className="inline-block w-3 h-[2px] bg-purple-300 rounded-full"></span>
-            </p>
-          </motion.div>
-
-          {/* Error */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mb-4 p-3.5 bg-red-50 border border-red-200 rounded-2xl"
-            >
-              <p className="text-sm text-red-600">{error}</p>
-            </motion.div>
-          )}
-
-          {/* Register Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-            >
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                邮箱地址
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3.5 bg-white/80 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none transition-all text-gray-800 placeholder-gray-400"
-                placeholder="your@email.com"
-              />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
-            >
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                密码
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="w-full px-4 py-3.5 bg-white/80 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none transition-all text-gray-800 placeholder-gray-400"
-                placeholder="至少6个字符"
-              />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-            >
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                确认密码
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3.5 bg-white/80 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none transition-all text-gray-800 placeholder-gray-400"
-                placeholder="再次输入密码"
-              />
-            </motion.div>
-
-            <motion.button
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.5 }}
-              type="submit"
-              disabled={loading}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3.5 px-4 rounded-2xl hover:shadow-[0_8px_30px_rgba(124,58,237,0.4)] active:scale-95 focus:ring-4 focus:ring-purple-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold shadow-xl"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <motion.span
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    className="inline-block w-5 h-5"
-                  >
-                    <svg viewBox="0 0 60 60" fill="none">
-                      <path d="M30 0L35 25L60 30L35 35L30 60L25 35L0 30L25 25Z" fill="white" />
-                    </svg>
-                  </motion.span>
-                  结印中...
-                </span>
-              ) : '注册'}
-            </motion.button>
-          </form>
-
-          {/* Login Link */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7, duration: 0.5 }}
-            className="mt-6 text-center"
-          >
-            <p className="text-sm text-gray-600">
-              已有账号？{' '}
-              <Link href="/login" className="text-purple-600 hover:text-purple-700 font-medium transition-colors underline decoration-transparent hover:decoration-purple-500">
-                立即登录
-              </Link>
-            </p>
-          </motion.div>
+          <h1 className="naruto-title text-3xl font-black text-orange-950">创建账号</h1>
+          <p className="mt-2 text-sm text-orange-900/80">加入火影主题 AI 平台，开启你的效率升级。</p>
         </div>
 
-        {/* Footer */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8, duration: 0.5 }}
-          className="text-center mt-8"
-        >
-          <p className="text-sm text-gray-500">
-            © 2026 FPGA FAE助手 - 木叶技术部
-          </p>
-          <div className="flex items-center justify-center gap-2 mt-1">
-            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-xs text-gray-400 hover:text-gray-500 transition-colors">
-              鄂ICP备2026007985号
-            </a>
-            <span className="text-xs text-gray-300">|</span>
-            <a href="mailto:3082463315@qq.com" className="text-xs text-gray-400 hover:text-gray-500 transition-colors">
-              投诉举报
-            </a>
+        {error && (
+          <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
           </div>
-        </motion.div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="mb-2 block text-sm font-semibold text-orange-900">
+              邮箱
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="your@email.com"
+              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="mb-2 block text-sm font-semibold text-orange-900">
+              密码
+            </label>
+            <input
+              id="password"
+              type="password"
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="至少 6 位"
+              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-semibold text-orange-900">
+              确认密码
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              placeholder="再次输入密码"
+              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="naruto-btn-accent mt-2 w-full rounded-2xl px-4 py-3.5 font-bold transition disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? '注册中...' : '注册并进入'}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-orange-900/80">
+          已有账号？
+          <Link href="/login" className="ml-1 font-semibold text-orange-700 underline hover:text-orange-800">
+            去登录
+          </Link>
+        </p>
       </motion.div>
     </div>
   )

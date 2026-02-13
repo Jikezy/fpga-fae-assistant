@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface HeaderProps {
@@ -19,20 +19,20 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [showUserMenu, setShowUserMenu] = useState(false)
 
   useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          const data = await response.json()
+          setUser(data.user)
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error)
+      }
+    }
+
     fetchUser()
   }, [])
-
-  const fetchUser = async () => {
-    try {
-      const response = await fetch('/api/auth/me')
-      if (response.ok) {
-        const data = await response.json()
-        setUser(data.user)
-      }
-    } catch (error) {
-      console.error('获取用户信息失败:', error)
-    }
-  }
 
   const handleLogout = async () => {
     try {
@@ -40,53 +40,52 @@ export default function Header({ onMenuClick }: HeaderProps) {
       router.push('/login')
       router.refresh()
     } catch (error) {
-      console.error('登出失败:', error)
+      console.error('退出登录失败:', error)
     }
   }
 
   return (
-    <header className="bg-gradient-to-br from-white/95 to-gray-50/90 backdrop-blur-[60px] backdrop-saturate-[200%] border-b border-gray-200/60 shadow-[0_8px_32px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.8)] px-3 py-3 sm:px-6 sm:py-4 flex items-center justify-between relative z-30">
-      <div className="flex items-center gap-4">
+    <header className="naruto-glass relative z-30 flex items-center justify-between border-b border-orange-200/70 px-3 py-3 sm:px-6 sm:py-4">
+      <div className="flex items-center gap-3 sm:gap-4">
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-xl hover:bg-gray-100 transition-all active:scale-95 hover:shadow-lg"
-          aria-label="Toggle menu"
+          className="rounded-xl p-2 text-orange-900 transition hover:bg-orange-100/70 active:scale-95 lg:hidden"
+          aria-label="打开菜单"
         >
-          <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="text-xl font-bold text-gray-800">
-          FPGA FAE助手
-        </h1>
+
+        <div>
+          <h1 className="naruto-title text-lg font-black text-orange-950 sm:text-xl">木叶 AI 作战台</h1>
+          <p className="hidden text-xs text-orange-800/70 sm:block">FPGA 咨询 · BOM 采购 · 推广联动</p>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
         <button
           onClick={() => router.push('/bom')}
-          className="px-3 py-2 rounded-xl text-sm font-medium text-gray-600 hover:text-orange-600 hover:bg-orange-50 transition-all flex items-center gap-1.5"
+          className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-semibold text-orange-900 transition hover:bg-orange-100/80"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
           </svg>
-          <span className="hidden sm:inline">BOM采购</span>
+          <span className="hidden sm:inline">BOM 采购</span>
         </button>
 
-        {/* User Menu */}
         {user && (
           <div className="relative">
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-100 transition-all active:scale-95"
+              onClick={() => setShowUserMenu((prev) => !prev)}
+              className="flex items-center gap-2 rounded-xl px-2 py-1.5 transition hover:bg-orange-100/80 sm:px-3 sm:py-2"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg ring-2 ring-purple-200">
-                <span className="text-white text-sm font-medium">
-                  {user.email[0].toUpperCase()}
-                </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-sm font-bold text-white shadow-lg ring-2 ring-orange-200">
+                {user.email[0].toUpperCase()}
               </div>
-              <span className="text-sm text-gray-800 font-medium hidden md:block">{user.email}</span>
+              <span className="hidden text-sm font-medium text-orange-950 md:block">{user.email}</span>
               {user.role === 'admin' && (
-                <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 text-xs rounded-full font-semibold shadow ring-1 ring-purple-300">
+                <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800 ring-1 ring-orange-300">
                   管理员
                 </span>
               )}
@@ -94,46 +93,45 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
             {showUserMenu && (
               <>
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setShowUserMenu(false)}
-                />
-                <div className="absolute right-0 mt-2 w-48 bg-gradient-to-br from-white/25 to-white/15 backdrop-blur-[40px] backdrop-saturate-[180%] border border-white/35 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.5)] z-20 py-2 overflow-hidden">
-                  <div className="px-4 py-2 border-b border-white/20">
-                    <p className="text-sm font-medium text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{user.email}</p>
-                    <p className="text-xs text-white/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{user.role === 'admin' ? '管理员' : '普通用户'}</p>
+                <div className="fixed inset-0 z-10" onClick={() => setShowUserMenu(false)} />
+                <div className="naruto-glass absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-2xl py-2">
+                  <div className="border-b border-orange-200/70 px-4 py-2">
+                    <p className="truncate text-sm font-semibold text-orange-950">{user.email}</p>
+                    <p className="text-xs text-orange-800/80">{user.role === 'admin' ? '管理员' : '普通用户'}</p>
                   </div>
+
                   <button
                     onClick={() => {
                       router.push('/settings')
                       setShowUserMenu(false)
                     }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-gray-100 transition-all active:scale-95 flex items-center gap-2"
+                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-orange-950 transition hover:bg-orange-100/70"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                     AI 设置
                   </button>
+
                   {user.role === 'admin' && (
                     <button
                       onClick={() => {
                         router.push('/admin')
                         setShowUserMenu(false)
                       }}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-800 hover:bg-gray-100 transition-all active:scale-95 flex items-center gap-2"
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-orange-950 transition hover:bg-orange-100/70"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18" />
                       </svg>
-                      管理员面板
+                      管理后台
                     </button>
                   )}
+
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-all active:scale-95"
+                    className="w-full px-4 py-2 text-left text-sm font-semibold text-red-700 transition hover:bg-red-50"
                   >
                     退出登录
                   </button>
