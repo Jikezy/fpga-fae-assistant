@@ -84,9 +84,14 @@ export async function POST(req: NextRequest) {
       const aiBaseUrl = user.anthropic_base_url || ''
       const aiLooksDeepSeek = /deepseek/i.test(aiModel) || /deepseek/i.test(aiBaseUrl)
 
+      const fallbackApiKey = aiLooksDeepSeek && user.bom_api_key ? user.anthropic_api_key : undefined
+      const fallbackBaseUrl = aiLooksDeepSeek && user.bom_api_key ? user.anthropic_base_url : undefined
+
       return {
         apiKey: user.bom_api_key || (aiLooksDeepSeek ? user.anthropic_api_key : undefined),
         baseUrl: user.bom_base_url || (aiLooksDeepSeek ? user.anthropic_base_url : undefined),
+        backupApiKey: fallbackApiKey,
+        backupBaseUrl: fallbackBaseUrl,
         model: /deepseek/i.test(aiModel) ? aiModel : undefined,
       }
     })() : undefined

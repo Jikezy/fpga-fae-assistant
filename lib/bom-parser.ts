@@ -43,11 +43,13 @@ const modelSkipCache = new Map<string, number>()
  */
 export async function parseBomText(
   text: string,
-  userConfig?: { apiKey?: string; baseUrl?: string; model?: string }
+  userConfig?: { apiKey?: string; baseUrl?: string; model?: string; backupApiKey?: string; backupBaseUrl?: string }
 ): Promise<ParseResult> {
   const userApiKey = userConfig?.apiKey?.trim()
   const envApiKey = process.env.DEEPSEEK_API_KEY?.trim()
   const userBaseUrl = normalizeBaseUrl(userConfig?.baseUrl)
+  const backupApiKey = userConfig?.backupApiKey?.trim()
+  const backupBaseUrl = normalizeBaseUrl(userConfig?.backupBaseUrl)
   const defaultBaseUrl = 'https://api.deepseek.com'
   const modelCandidates = buildModelCandidates(userConfig?.model, process.env.DEEPSEEK_MODEL)
   const { maxTokens, timeoutMs } = getDynamicAiBudget(text)
@@ -61,6 +63,15 @@ export async function parseBomText(
 
     if (primaryBaseUrl !== defaultBaseUrl) {
       candidates.push({ apiKey: userApiKey, baseUrl: defaultBaseUrl, source: 'user-default-base' })
+    }
+  }
+
+  if (backupApiKey && backupApiKey !== userApiKey) {
+    const backupPrimaryBaseUrl = backupBaseUrl || defaultBaseUrl
+    candidates.push({ apiKey: backupApiKey, baseUrl: backupPrimaryBaseUrl, source: 'backup' })
+
+    if (backupPrimaryBaseUrl !== defaultBaseUrl) {
+      candidates.push({ apiKey: backupApiKey, baseUrl: defaultBaseUrl, source: 'backup-default-base' })
     }
   }
 
@@ -89,52 +100,63 @@ export async function parseBomText(
         }
 
         try {
-          const response = await fetch(endpoint, {
+          let requestBody = buildCompletionRequest(model, text, maxTokens, true)
+          let response = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${candidate.apiKey}`,
             },
-            body: JSON.stringify({
-              model,
-              messages: [
-                { role: 'system', content: BOM_SYSTEM_PROMPT },
-                { role: 'user', content: text },
-              ],
-              max_tokens: maxTokens,
-              temperature: 0.1,
-              response_format: { type: 'json_object' },
-            }),
+            body: JSON.stringify(requestBody),
             signal: AbortSignal.timeout(timeoutMs),
           })
 
           if (!response.ok) {
-            const errText = await response.text()
-            lastErrorReason = classifyApiFailure(response.status, errText, candidate.source, modelTag)
-            console.error(
-              `DeepSeek API request failed (${candidate.source}):`,
-              response.status,
-              `model=${model}`,
-              `endpoint=${endpoint}`,
-              errText
-            )
+            let errText = await response.text()
 
-            if (response.status === 401 || response.status === 403) {
-              candidateBlocked = true
-              break
+            if (isUnsupportedResponseFormatError(response.status, errText)) {
+              requestBody = buildCompletionRequest(model, text, maxTokens, false)
+              response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${candidate.apiKey}`,
+                },
+                body: JSON.stringify(requestBody),
+                signal: AbortSignal.timeout(timeoutMs),
+              })
+
+              if (!response.ok) {
+                errText = await response.text()
+              }
             }
 
-            if (isModelNotSupported(response.status, errText)) {
-              markModelAsUnavailable(endpoint, model)
+            if (!response.ok) {
+              lastErrorReason = classifyApiFailure(response.status, errText, candidate.source, modelTag)
+              console.error(
+                `DeepSeek API request failed (${candidate.source}):`,
+                response.status,
+                `model=${model}`,
+                `endpoint=${endpoint}`,
+                errText
+              )
+
+              if (response.status === 401 || response.status === 403) {
+                candidateBlocked = true
+                break
+              }
+
+              if (isModelNotSupported(response.status, errText)) {
+                markModelAsUnavailable(endpoint, model)
+                continue
+              }
+
+              if (isLikelyEndpointMismatch(response.status, errText)) {
+                break
+              }
+
               continue
             }
-
-            if (isLikelyEndpointMismatch(response.status, errText)) {
-              break
-            }
-
-            candidateBlocked = true
-            break
           }
 
           const data = await response.json()
@@ -148,6 +170,15 @@ export async function parseBomText(
 
           const payload = extractJsonPayload(content)
           if (!payload) {
+            const rescued = deriveItemsFromAiText(content)
+            if (rescued.length > 0) {
+              return {
+                items: rescued,
+                warnings: [`AI recovered via text fallback (${model})`],
+                parseEngine: 'deepseek',
+              }
+            }
+
             lastErrorReason = `json_extract_failed_${candidate.source}_${modelTag}`
             console.error(`DeepSeek response does not contain valid JSON (${candidate.source}, model=${model})`)
             continue
@@ -256,6 +287,30 @@ function buildCompletionEndpointCandidates(baseUrl: string): string[] {
   }
 
   return Array.from(new Set(candidates))
+}
+
+function buildCompletionRequest(model: string, text: string, maxTokens: number, strictJson: boolean): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    model,
+    messages: [
+      { role: 'system', content: BOM_SYSTEM_PROMPT },
+      { role: 'user', content: text },
+    ],
+    max_tokens: maxTokens,
+    temperature: 0.1,
+  }
+
+  if (strictJson) {
+    payload.response_format = { type: 'json_object' }
+  }
+
+  return payload
+}
+
+function isUnsupportedResponseFormatError(status: number, errText: string): boolean {
+  if (![400, 422].includes(status)) return false
+  const normalized = errText.toLowerCase()
+  return /response_format|json_object/.test(normalized) && /unsupported|invalid|not\s*allowed|unknown/.test(normalized)
 }
 
 function classifyApiFailure(status: number, errText: string, source: string, modelTag: string): string {
