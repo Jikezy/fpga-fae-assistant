@@ -689,6 +689,7 @@ function extractTrailingQuantity(line: string): { body: string; quantity: number
 function normalizeParsedText(text: string): string {
   return text
     .replace(/[\uFF0C,;\uFF1B\u3002]+$/g, '')
+    .replace(/(?:\u5C01\u88C5|\u5C01\u88DD|\u5C01)\s*$/u, '')
     .replace(/\s*[x\u00D7*]\s*$/i, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -772,7 +773,7 @@ function cleanSearchKeyword(keyword: string, name: string, category: string): st
   cleaned = cleaned
     .replace(/SW-TH[_-][\w-]*/gi, '') // 移除 SW-TH 开关库代码
     .replace(/LCC-LGA-\d+[_-]?[LWH][\d.-]*/gi, 'LCC') // LCC-LGA-109_L17.7 → LCC
-    .replace(/[_-]?[LWH][\d.]+(-[LWH][\d.]+)*/gi, '') // 移除 L17.7-W15.8-H2.5
+    .replace(/(?<![A-Za-z0-9])(?:L|W|H)\d+(?:\.\d+)?(?:-(?:L|W|H)\d+(?:\.\d+)?)*(?![A-Za-z0-9])/gi, ' ') // 移除 L17.7-W15.8-H2.5
     .trim()
 
   // 2. 提取并保留标准封装信息
