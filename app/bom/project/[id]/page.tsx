@@ -59,6 +59,7 @@ export default function ProjectDetailPage() {
   const [editingKeyword, setEditingKeyword] = useState<string | null>(null)
   const [editKeywordValue, setEditKeywordValue] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletingSelected, setDeletingSelected] = useState(false)
   const [engineHint, setEngineHint] = useState<string | null>(null)
   const [fallbackHint, setFallbackHint] = useState<string | null>(null)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
@@ -351,18 +352,76 @@ export default function ProjectDetailPage() {
     setEditingKeyword(null)
   }
 
-  // 删除单个元器件
+  const applyRemovedItems = (removedIds: string[]) => {
+    if (removedIds.length === 0) return
+
+    const removedSet = new Set(removedIds)
+
+    setItems(prev => {
+      const next = prev.filter(item => !removedSet.has(item.id))
+      let total = 0
+      for (const item of next) {
+        if (item.best_price && !isNaN(item.best_price) && item.best_price > 0) {
+          total += item.best_price * item.quantity
+        }
+      }
+      setTotalPrice(total)
+      return next
+    })
+
+    setSelectedItems(prev => {
+      const next = new Set(prev)
+      for (const id of removedIds) next.delete(id)
+      return next
+    })
+
+    setVisitedItems(prev => {
+      const next = new Set(prev)
+      for (const id of removedIds) next.delete(id)
+      localStorage.setItem(`bom-visited-${projectId}`, JSON.stringify([...next]))
+      return next
+    })
+
+    setExpandedItem(prev => (prev && removedSet.has(prev) ? null : prev))
+  }
+
+  // Delete single item
   const deleteItemHandler = async (itemId: string) => {
+    if (deletingSelected) return
+
     setDeletingId(itemId)
     try {
       const res = await fetch(`/api/bom/project?itemId=${itemId}`, { method: 'DELETE' })
       if (res.ok) {
-        setItems(prev => prev.filter(i => i.id !== itemId))
+        applyRemovedItems([itemId])
       }
     } catch (error) {
-      console.error('删除元器件失败:', error)
+      console.error('Failed to delete item:', error)
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  // Delete selected items
+  const deleteSelectedItems = async () => {
+    const ids = Array.from(selectedItems)
+    if (ids.length === 0) return
+
+    setDeletingSelected(true)
+    try {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          const res = await fetch(`/api/bom/project?itemId=${id}`, { method: 'DELETE' })
+          return { id, ok: res.ok }
+        })
+      )
+
+      const deletedIds = results.filter(result => result.ok).map(result => result.id)
+      applyRemovedItems(deletedIds)
+    } catch (error) {
+      console.error('Failed to delete selected items:', error)
+    } finally {
+      setDeletingSelected(false)
     }
   }
 
@@ -501,6 +560,20 @@ export default function ProjectDetailPage() {
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               导出 CSV
+            </button>
+
+            <button
+              onClick={deleteSelectedItems}
+              disabled={selectedItems.size === 0 || deletingSelected}
+              className="px-5 py-2.5 bg-white/80 backdrop-blur-sm border border-red-200 text-red-600 font-medium rounded-xl hover:bg-red-50 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={selectedItems.size > 0 ? `\u5220\u9664\u5df2\u52fe\u9009\u7684 ${selectedItems.size} \u4e2a\u5143\u5668\u4ef6` : '\u8bf7\u5148\u52fe\u9009\u5143\u5668\u4ef6'}
+            >
+              {deletingSelected ? (
+                <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              )}
+              {deletingSelected ? '\u5220\u9664\u4e2d...' : `\u5220\u9664\u52fe\u9009${selectedItems.size > 0 ? ` (${selectedItems.size})` : ''}`}
             </button>
 
             {/* 已访问进度 + 清除 */}
@@ -682,7 +755,7 @@ export default function ProjectDetailPage() {
 
                       <button
                         onClick={() => deleteItemHandler(item.id)}
-                        disabled={deletingId === item.id}
+                        disabled={deletingId === item.id || deletingSelected}
                         className="px-3 py-1.5 bg-gray-50 text-gray-500 text-xs font-medium rounded-lg hover:bg-red-50 hover:text-red-500 transition-all disabled:opacity-50"
                         title="删除此元器件"
                       >
@@ -730,7 +803,7 @@ export default function ProjectDetailPage() {
                         <span className="text-xs text-gray-500">x{item.quantity}</span>
                         <button
                           onClick={() => deleteItemHandler(item.id)}
-                          disabled={deletingId === item.id}
+                          disabled={deletingId === item.id || deletingSelected}
                           className="text-gray-400 hover:text-red-500 transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
