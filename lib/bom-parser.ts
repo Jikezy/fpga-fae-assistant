@@ -34,7 +34,8 @@ Rules:
 - Keep one item per component line.
 - quantity must be integer >= 1.
 - searchKeyword must be concise for ecommerce search, remove package-only tails and trailing quantity markers.
-- category must be one of: chip, capacitor, resistor, inductor, diode, transistor, module, connector, cable, tool, other.
+- Use Simplified Chinese for generic component terms (for example: resistor -> 电阻, capacitor -> 电容); keep model numbers and package codes unchanged.
+- category must be one of: 芯片, 电容, 电阻, 电感, 二极管, 三极管, 模块, 连接器, 线材, 工具, 其他.
 - If uncertain, keep best guess and add a short warning.
 Output JSON only.`
 
@@ -608,21 +609,25 @@ function normalizeAiItem(raw: unknown): BomItem | null {
 
   const source = isRecord(raw.item) ? raw.item : raw
 
-  const name = pickFirstString(source, ['name', 'model', 'part', 'component', '名称', '元器件'])
-  if (!name) return null
+  const rawName = pickFirstString(source, ['name', 'model', 'part', 'component', '\u540d\u79f0', '\u5143\u5668\u4ef6'])
+  if (!rawName) return null
 
-  const spec = pickFirstString(source, ['spec', 'value', 'package', 'footprint', '规格']) || ''
-  const category = pickFirstString(source, ['category', 'type', '分类']) || inferCategory(name, spec)
-  const quantityValue = pickFirstNumber(source, ['quantity', 'qty', 'count', '数量'])
+  const rawSpec = pickFirstString(source, ['spec', 'value', 'package', 'footprint', '\u89c4\u683c']) || ''
+  const name = localizeComponentText(rawName)
+  const spec = localizeComponentText(rawSpec)
+  const rawCategory = pickFirstString(source, ['category', 'type', '\u5206\u7c7b'])
+  const category = normalizeCategoryLabel(rawCategory, name, spec)
+  const quantityValue = pickFirstNumber(source, ['quantity', 'qty', 'count', '\u6570\u91cf'])
   const quantity = quantityValue && quantityValue > 0 ? Math.floor(quantityValue) : 1
 
-  const rawKeyword = pickFirstString(source, ['searchKeyword', 'keyword', 'search', '搜索关键词']) || `${name} ${spec}`.trim()
+  const rawKeyword = pickFirstString(source, ['searchKeyword', 'keyword', 'search', '\u641c\u7d22\u5173\u952e\u8bcd']) || `${name} ${spec}`.trim()
+  const normalizedKeyword = localizeComponentText(rawKeyword)
 
   return {
     name,
     spec,
     quantity,
-    searchKeyword: cleanSearchKeyword(rawKeyword, name, category),
+    searchKeyword: cleanSearchKeyword(normalizedKeyword, name, category),
     category,
   }
 }
@@ -636,9 +641,11 @@ function normalizeAiLineItem(raw: unknown): BomItem | null {
   const normalizedBody = normalizeParsedText(body)
   if (!normalizedBody) return null
 
-  const { name, spec } = splitNameAndSpec(normalizedBody)
-  if (!name) return null
+  const { name: parsedName, spec: parsedSpec } = splitNameAndSpec(normalizedBody)
+  if (!parsedName) return null
 
+  const name = localizeComponentText(parsedName)
+  const spec = localizeComponentText(parsedSpec)
   const category = inferCategory(name, spec)
   const rawKeyword = spec ? `${name} ${spec}` : name
 
@@ -790,7 +797,7 @@ async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Prom
     return null
   }
 
-  const chunkSize = 14
+  const chunkSize = lines.length >= 120 ? 20 : 16
   const chunks: string[] = []
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'))
@@ -805,8 +812,10 @@ async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Prom
   let deepseekChunkCount = 0
   let ruleChunkCount = 0
 
-  for (let i = 0; i < chunks.length; i += 2) {
-    const batch = chunks.slice(i, i + 2)
+  const batchSize = chunks.length >= 6 ? 3 : 2
+
+  for (let i = 0; i < chunks.length; i += batchSize) {
+    const batch = chunks.slice(i, i + batchSize)
     const batchResults = await Promise.all(
       batch.map(async (chunk, offset) => {
         const chunkIndex = i + offset + 1
@@ -956,7 +965,9 @@ function ruleBasedParse(text: string): ParseResult {
 
     const { body, quantity } = extractTrailingQuantity(trimmed)
     const normalizedBody = normalizeParsedText(body)
-    const { name, spec, lowConfidence } = splitNameAndSpec(normalizedBody)
+    const { name: parsedName, spec: parsedSpec, lowConfidence } = splitNameAndSpec(normalizedBody)
+    const name = localizeComponentText(parsedName)
+    const spec = localizeComponentText(parsedSpec)
     const category = inferCategory(name, spec)
     const rawKeyword = spec ? `${name} ${spec}` : name
 
@@ -1082,18 +1093,73 @@ function splitNameAndSpec(text: string): { name: string; spec: string; lowConfid
 function inferCategory(name: string, spec: string): string {
   const text = (name + ' ' + spec).toLowerCase()
 
-  if (/stm32|esp32|at89|pic|arm|mcu|cpu|芯片|单片机/.test(text)) return '芯片'
-  if (/电容|cap|capacitor|uf|nf|pf/.test(text)) return '电容'
-  if (/电阻|res|resistor|欧|ohm|kω|mω/.test(text)) return '电阻'
-  if (/电感|inductor|线圈/.test(text)) return '电感'
-  if (/二极管|diode|led|发光/.test(text)) return '二极管'
-  if (/三极管|transistor|mos|fet/.test(text)) return '三极管'
-  if (/模块|module|传感器|sensor/.test(text)) return '模块'
-  if (/连接器|connector|排针|杜邦/.test(text)) return '连接器'
-  if (/线|wire|cable|导线/.test(text)) return '线材'
-  if (/工具|tool|焊/.test(text)) return '工具'
+  if (/stm32|esp32|at89|pic|arm|mcu|cpu|\u82af\u7247|\u5355\u7247\u673a/.test(text)) return '\u82af\u7247'
+  if (/\u7535\u5bb9|cap|capacitor|uf|nf|pf/.test(text)) return '\u7535\u5bb9'
+  if (/\u7535\u963b|res|resistor|\u6b27|ohm|k\u03c9|m\u03c9/.test(text)) return '\u7535\u963b'
+  if (/\u7535\u611f|inductor|\u7ebf\u5708/.test(text)) return '\u7535\u611f'
+  if (/\u4e8c\u6781\u7ba1|diode|led|\u53d1\u5149/.test(text)) return '\u4e8c\u6781\u7ba1'
+  if (/\u4e09\u6781\u7ba1|transistor|mos|fet/.test(text)) return '\u4e09\u6781\u7ba1'
+  if (/\u6a21\u5757|module|\u4f20\u611f\u5668|sensor/.test(text)) return '\u6a21\u5757'
+  if (/\u8fde\u63a5\u5668|connector|\u6392\u9488|\u675c\u90a6/.test(text)) return '\u8fde\u63a5\u5668'
+  if (/\u7ebf|wire|cable|\u5bfc\u7ebf/.test(text)) return '\u7ebf\u6750'
+  if (/\u5de5\u5177|tool|\u710a/.test(text)) return '\u5de5\u5177'
 
-  return '其他'
+  return '\u5176\u4ed6'
+}
+
+function normalizeCategoryLabel(category: string | undefined, name: string, spec: string): string {
+  const raw = category?.trim()
+  if (!raw) return inferCategory(name, spec)
+
+  const text = raw.toLowerCase()
+
+  if (/\u82af\u7247|\u5355\u7247\u673a|ic|mcu|cpu|soc|controller|processor|chip/.test(text)) return '\u82af\u7247'
+  if (/\u7535\u5bb9|capacitor|\bcap\b/.test(text)) return '\u7535\u5bb9'
+  if (/\u7535\u963b|resistor|resistance|\bres\b/.test(text)) return '\u7535\u963b'
+  if (/\u7535\u611f|inductor|choke/.test(text)) return '\u7535\u611f'
+  if (/\u4e8c\u6781\u7ba1|diode|\bled\b/.test(text)) return '\u4e8c\u6781\u7ba1'
+  if (/\u4e09\u6781\u7ba1|transistor|mosfet|\bfet\b|\bbjt\b/.test(text)) return '\u4e09\u6781\u7ba1'
+  if (/\u6a21\u5757|module|sensor|board/.test(text)) return '\u6a21\u5757'
+  if (/\u8fde\u63a5\u5668|connector|header|socket|terminal|plug/.test(text)) return '\u8fde\u63a5\u5668'
+  if (/\u7ebf\u6750|\u7ebf\u7f06|cable|wire|harness/.test(text)) return '\u7ebf\u6750'
+  if (/\u5de5\u5177|tool|solder|\u710a\u63a5/.test(text)) return '\u5de5\u5177'
+  if (/\u5176\u4ed6|other|misc|unknown/.test(text)) return '\u5176\u4ed6'
+
+  return inferCategory(name, spec)
+}
+
+function localizeComponentText(text: string): string {
+  const trimmed = text.trim()
+  if (!trimmed) return ''
+
+  const replacements: Array<[RegExp, string]> = [
+    [/\bceramic capacitors?\b/gi, '\u9676\u74f7\u7535\u5bb9'],
+    [/\belectrolytic capacitors?\b/gi, '\u7535\u89e3\u7535\u5bb9'],
+    [/\btantalum capacitors?\b/gi, '\u94bd\u7535\u5bb9'],
+    [/\bchip resistors?\b/gi, '\u8d34\u7247\u7535\u963b'],
+    [/\bresistors?\b/gi, '\u7535\u963b'],
+    [/\bcapacitors?\b/gi, '\u7535\u5bb9'],
+    [/\binductors?\b/gi, '\u7535\u611f'],
+    [/\bdiodes?\b/gi, '\u4e8c\u6781\u7ba1'],
+    [/\btransistors?\b/gi, '\u4e09\u6781\u7ba1'],
+    [/\bmosfets?\b/gi, 'MOS\u7ba1'],
+    [/\bconnectors?\b/gi, '\u8fde\u63a5\u5668'],
+    [/\bcables?\b/gi, '\u7ebf\u6750'],
+    [/\bwires?\b/gi, '\u5bfc\u7ebf'],
+    [/\bmodules?\b/gi, '\u6a21\u5757'],
+    [/\bsensors?\b/gi, '\u4f20\u611f\u5668'],
+    [/\bswitches?\b/gi, '\u5f00\u5173'],
+    [/\bbuttons?\b/gi, '\u6309\u952e'],
+    [/\bchips?\b/gi, '\u82af\u7247'],
+    [/\bics?\b/gi, '\u82af\u7247'],
+  ]
+
+  let localized = trimmed
+  for (const [pattern, replacement] of replacements) {
+    localized = localized.replace(pattern, replacement)
+  }
+
+  return localized.replace(/\s{2,}/g, ' ').trim()
 }
 
 /**
