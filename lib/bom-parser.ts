@@ -75,7 +75,8 @@ export async function parseBomText(
     }
   }
 
-  if (envApiKey && envApiKey !== userApiKey) {
+  const hasUserProvidedCandidate = candidates.length > 0
+  if (!hasUserProvidedCandidate && envApiKey) {
     candidates.push({ apiKey: envApiKey, baseUrl: defaultBaseUrl, source: 'env' })
   }
 
