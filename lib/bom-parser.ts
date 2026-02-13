@@ -455,17 +455,17 @@ function extractJsonPayload(content: string): unknown | null {
 
 function tryParseJsonCandidate(candidate: string): unknown | null {
   const direct = tryJsonParse(candidate)
-  if (direct !== null) return direct
+  if (direct !== null) return unwrapNestedJsonString(direct)
 
   const relaxed = candidate
     .replace(/^\uFEFF+/, '')
-    .replace(/[“”]/g, '"')
-    .replace(/[‘’]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
     .replace(/,\s*([}\]])/g, '$1')
 
   if (relaxed !== candidate) {
     const parsed = tryJsonParse(relaxed)
-    if (parsed !== null) return parsed
+    if (parsed !== null) return unwrapNestedJsonString(parsed)
   }
 
   return null
@@ -477,6 +477,32 @@ function tryJsonParse(value: string): unknown | null {
   } catch {
     return null
   }
+}
+
+function unwrapNestedJsonString(value: unknown, depth = 0): unknown {
+  if (depth > 3 || typeof value !== 'string') {
+    return value
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return value
+  }
+
+  const looksJson =
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'))
+
+  if (!looksJson) {
+    return value
+  }
+
+  const parsed = tryJsonParse(trimmed)
+  if (parsed === null) {
+    return value
+  }
+
+  return unwrapNestedJsonString(parsed, depth + 1)
 }
 
 function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: string[] } {
@@ -569,7 +595,7 @@ function deriveItemsFromAiText(content: string): BomItem[] {
   const lines = content
     .split(/[\n;\uFF1B]/)
     .map(line => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, '').trim())
-    .filter(Boolean)
+    .filter(line => line && !isJsonArtifactLine(line))
 
   const items: BomItem[] = []
   for (const line of lines) {
@@ -578,6 +604,25 @@ function deriveItemsFromAiText(content: string): BomItem[] {
   }
 
   return items
+}
+
+function isJsonArtifactLine(line: string): boolean {
+  const trimmed = line.trim()
+  if (!trimmed) return true
+
+  if (/^[{}\[\],]+$/.test(trimmed)) {
+    return true
+  }
+
+  if (/^"?[A-Za-z0-9_\u4e00-\u9fa5]+"?\s*:\s*/.test(trimmed)) {
+    return true
+  }
+
+  if (/^"(?:items|warnings|name|spec|quantity|searchKeyword|category)"\s*:/i.test(trimmed)) {
+    return true
+  }
+
+  return false
 }
 
 function pickFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
