@@ -41,6 +41,20 @@ interface OpsMetrics {
   tables: OpsTableStat[]
 }
 
+const OPS_TABLE_NAME_MAP: Record<string, string> = {
+  documents: '??',
+  sessions: '??',
+  bom_items: 'BOM ???',
+  price_cache: '????',
+  bom_projects: 'BOM ??',
+  proxy_api_keys: '?? API ??',
+  users: '??',
+  ai_providers: 'AI ???',
+  embeddings: '????',
+  proxy_logs: '????',
+  pdf_files: 'PDF ??',
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
@@ -103,7 +117,7 @@ export default function AdminPage() {
       setOpsMetrics(data)
     } catch (error) {
       console.error('load ops failed:', error)
-      setOpsError('Failed to load ops dashboard')
+      setOpsError('??????????????')
     } finally {
       setOpsLoading(false)
     }
@@ -169,6 +183,12 @@ export default function AdminPage() {
   }
 
   const formatCount = (value: number) => value.toLocaleString('zh-CN')
+
+  const formatOpsTableName = (tableName: string) => {
+    const displayName = OPS_TABLE_NAME_MAP[tableName]
+    if (!displayName) return tableName
+    return `${displayName} (${tableName})`
+  }
 
   const handleDatabaseMigrate = async () => {
     if (!confirm('确定要执行数据库迁移吗？这将为用户表添加API配置字段。')) {
@@ -286,13 +306,13 @@ export default function AdminPage() {
         {/* 数据库工具 */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Ops Dashboard (Admin only)</h2>
+            <h2 className="text-lg font-semibold text-gray-900">??????????</h2>
             <button
               onClick={loadOps}
               disabled={opsLoading}
               className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
-              {opsLoading ? 'Refreshing...' : 'Refresh'}
+              {opsLoading ? '???...' : '??'}
             </button>
           </div>
 
@@ -306,22 +326,22 @@ export default function AdminPage() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">BOM projects (24h)</p>
+                  <p className="text-xs text-gray-500">BOM ???24???</p>
                   <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.bomProjects24h)}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">BOM items (24h)</p>
+                  <p className="text-xs text-gray-500">BOM ????24???</p>
                   <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.bomItems24h)}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">Active price cache</p>
+                  <p className="text-xs text-gray-500">??????</p>
                   <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.activePriceCache)}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">Database size</p>
+                  <p className="text-xs text-gray-500">?????</p>
                   <p className="text-2xl font-semibold text-gray-900">{opsMetrics.database.pretty}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Free 0.5GB usage: {opsMetrics.pressure.usagePercentOfHalfGb}%
+                    ?? 0.5GB ??????{opsMetrics.pressure.usagePercentOfHalfGb}%
                   </p>
                 </div>
               </div>
@@ -330,15 +350,15 @@ export default function AdminPage() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="text-left py-2 pr-4">Table</th>
-                      <th className="text-left py-2 pr-4">Rows (estimate)</th>
-                      <th className="text-left py-2">Storage</th>
+                      <th className="text-left py-2 pr-4">???</th>
+                      <th className="text-left py-2 pr-4">??????</th>
+                      <th className="text-left py-2">??</th>
                     </tr>
                   </thead>
                   <tbody>
                     {opsMetrics.tables.map((table) => (
                       <tr key={table.tableName} className="border-b border-gray-100">
-                        <td className="py-2 pr-4 text-gray-900">{table.tableName}</td>
+                        <td className="py-2 pr-4 text-gray-900">{formatOpsTableName(table.tableName)}</td>
                         <td className="py-2 pr-4 text-gray-600">{formatCount(table.rowEstimate)}</td>
                         <td className="py-2 text-gray-600">{table.pretty}</td>
                       </tr>
@@ -348,7 +368,7 @@ export default function AdminPage() {
               </div>
 
               <p className="text-xs text-gray-500 mt-3">
-                Updated at: {new Date(opsMetrics.generatedAt).toLocaleString('zh-CN')}
+                ?????{new Date(opsMetrics.generatedAt).toLocaleString('zh-CN')}
               </p>
             </>
           )}
