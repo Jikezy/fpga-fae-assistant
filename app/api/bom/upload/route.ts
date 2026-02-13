@@ -77,12 +77,19 @@ export async function POST(req: NextRequest) {
     const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
     await ensureAiModelColumn()
     const sql = getSql()
-    const userRows = await sql`SELECT bom_api_key, bom_base_url, ai_model FROM users WHERE id = ${authResult.user.id}`
-    const bomConfig = userRows.length > 0 ? {
-      apiKey: (userRows[0] as any).bom_api_key,
-      baseUrl: (userRows[0] as any).bom_base_url,
-      model: /deepseek/i.test((userRows[0] as any).ai_model || '') ? (userRows[0] as any).ai_model : undefined,
-    } : undefined
+    const userRows = await sql`SELECT bom_api_key, bom_base_url, ai_model, anthropic_api_key, anthropic_base_url FROM users WHERE id = ${authResult.user.id}`
+    const bomConfig = userRows.length > 0 ? (() => {
+      const user = userRows[0] as any
+      const aiModel = user.ai_model || ''
+      const aiBaseUrl = user.anthropic_base_url || ''
+      const aiLooksDeepSeek = /deepseek/i.test(aiModel) || /deepseek/i.test(aiBaseUrl)
+
+      return {
+        apiKey: user.bom_api_key || (aiLooksDeepSeek ? user.anthropic_api_key : undefined),
+        baseUrl: user.bom_base_url || (aiLooksDeepSeek ? user.anthropic_base_url : undefined),
+        model: /deepseek/i.test(aiModel) ? aiModel : undefined,
+      }
+    })() : undefined
 
     // AI 解析提取的文本
     const parseResult = await parseBomText(extractedText, bomConfig)

@@ -34,6 +34,9 @@ const BOM_SYSTEM_PROMPT = `你是电子元器件 BOM 解析专家。将文本解
 
 只返回JSON：{"items": [...], "warnings": []}`
 
+const MODEL_SKIP_CACHE_TTL_MS = 30 * 60 * 1000
+const modelSkipCache = new Map<string, number>()
+
 /**
  * 使用 DeepSeek AI 解析 BOM 文本
  * 优先用用户自己的 DeepSeek 配置，回退到系统环境变量，最后降级规则解析
@@ -80,6 +83,11 @@ export async function parseBomText(
       for (const model of modelCandidates) {
         const modelTag = sanitizeModelName(model)
 
+        if (shouldSkipModelForEndpoint(endpoint, model)) {
+          lastErrorReason = `model_cached_unavailable_${candidate.source}_${modelTag}`
+          continue
+        }
+
         try {
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -117,6 +125,7 @@ export async function parseBomText(
             }
 
             if (isModelNotSupported(response.status, errText)) {
+              markModelAsUnavailable(endpoint, model)
               continue
             }
 
@@ -146,6 +155,15 @@ export async function parseBomText(
 
           const parsed = normalizeAiResponse(payload)
           if (parsed.items.length === 0) {
+            const rescued = deriveItemsFromAiText(content)
+            if (rescued.length > 0) {
+              return {
+                items: rescued,
+                warnings: [...parsed.warnings, `AI recovered via text fallback (${model})`],
+                parseEngine: 'deepseek',
+              }
+            }
+
             lastErrorReason = `no_items_${candidate.source}_${modelTag}`
             console.error(`DeepSeek response has no valid items (${candidate.source}, model=${model})`)
             continue
@@ -209,6 +227,24 @@ function buildModelCandidates(preferredModel?: string, envModel?: string): strin
 function sanitizeModelName(model: string): string {
   const normalized = model.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
   return normalized || 'default-model'
+}
+
+function shouldSkipModelForEndpoint(endpoint: string, model: string): boolean {
+  const key = `${endpoint.toLowerCase()}::${model.toLowerCase()}`
+  const ts = modelSkipCache.get(key)
+  if (!ts) return false
+
+  if (Date.now() - ts > MODEL_SKIP_CACHE_TTL_MS) {
+    modelSkipCache.delete(key)
+    return false
+  }
+
+  return true
+}
+
+function markModelAsUnavailable(endpoint: string, model: string): void {
+  const key = `${endpoint.toLowerCase()}::${model.toLowerCase()}`
+  modelSkipCache.set(key, Date.now())
 }
 
 function buildCompletionEndpointCandidates(baseUrl: string): string[] {
@@ -355,6 +391,11 @@ function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: st
       if (guessed) rawItems = guessed
     }
 
+    if (rawItems.length === 0) {
+      const single = normalizeAiItem(payload)
+      if (single) rawItems = [payload]
+    }
+
     if (Array.isArray(payload.warnings)) {
       for (const w of payload.warnings) {
         if (typeof w === 'string' && w.trim()) warnings.push(w.trim())
@@ -366,7 +407,7 @@ function normalizeAiResponse(payload: unknown): { items: BomItem[]; warnings: st
 
   const items: BomItem[] = []
   for (const raw of rawItems) {
-    const normalized = normalizeAiItem(raw)
+    const normalized = normalizeAiItem(raw) || normalizeAiLineItem(raw)
     if (normalized) items.push(normalized)
   }
 
@@ -395,6 +436,45 @@ function normalizeAiItem(raw: unknown): BomItem | null {
     searchKeyword: cleanSearchKeyword(rawKeyword, name, category),
     category,
   }
+}
+
+function normalizeAiLineItem(raw: unknown): BomItem | null {
+  if (typeof raw !== 'string') return null
+  const line = raw.trim()
+  if (!line) return null
+
+  const { body, quantity } = extractTrailingQuantity(line)
+  const normalizedBody = normalizeParsedText(body)
+  if (!normalizedBody) return null
+
+  const { name, spec } = splitNameAndSpec(normalizedBody)
+  if (!name) return null
+
+  const category = inferCategory(name, spec)
+  const rawKeyword = spec ? `${name} ${spec}` : name
+
+  return {
+    name,
+    spec,
+    quantity,
+    searchKeyword: cleanSearchKeyword(rawKeyword, name, category),
+    category,
+  }
+}
+
+function deriveItemsFromAiText(content: string): BomItem[] {
+  const lines = content
+    .split(/[\n;\uFF1B]/)
+    .map(line => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, '').trim())
+    .filter(Boolean)
+
+  const items: BomItem[] = []
+  for (const line of lines) {
+    const normalized = normalizeAiLineItem(line)
+    if (normalized) items.push(normalized)
+  }
+
+  return items
 }
 
 function pickFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
