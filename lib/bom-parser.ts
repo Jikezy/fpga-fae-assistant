@@ -823,8 +823,8 @@ async function parseBomByChunks(
           ? 40
           : 28
   const averageLineLength = Math.max(1, Math.ceil(text.length / Math.max(lines.length, 1)))
-  const sizeByTextDensity = Math.max(16, Math.floor(9000 / averageLineLength))
-  const chunkSize = Math.max(16, Math.min(baseChunkSize, sizeByTextDensity))
+  const sizeByTextDensity = Math.max(10, Math.floor(6000 / averageLineLength))
+  const chunkSize = Math.max(10, Math.min(baseChunkSize, sizeByTextDensity))
   const chunks: string[] = []
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'))
@@ -839,7 +839,7 @@ async function parseBomByChunks(
   let deepseekChunkCount = 0
   let ruleChunkCount = 0
 
-  const batchSize = chunks.length <= 6 ? chunks.length : chunks.length <= 10 ? 6 : 7
+  const batchSize = chunks.length <= 8 ? chunks.length : chunks.length <= 14 ? 8 : 10
 
   for (let i = 0; i < chunks.length; i += batchSize) {
     const batch = chunks.slice(i, i + batchSize)
@@ -1028,8 +1028,8 @@ function getDynamicAiBudget(
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 90))
 
   if (options?.chunkMode) {
-    const maxTokens = Math.max(960, Math.min(3072, 896 + estimatedItems * 22))
-    const timeoutMs = Math.max(12000, Math.min(22000, 10000 + estimatedItems * 180))
+    const maxTokens = Math.max(768, Math.min(2048, 512 + estimatedItems * 12))
+    const timeoutMs = Math.max(10000, Math.min(18000, 9000 + estimatedItems * 120))
     return { maxTokens, timeoutMs }
   }
 
