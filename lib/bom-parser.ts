@@ -793,18 +793,18 @@ function compactAiWarnings(warnings: string[]): string[] {
 
 async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Promise<ParseResult | null> {
   const lines = splitBomTextLines(text)
-  const shouldChunk = lines.length >= 72 || text.length >= 12000
+  const shouldChunk = lines.length >= 110 || (text.length >= 24000 && lines.length >= 60)
   if (!shouldChunk) {
     return null
   }
 
-  const chunkSize = lines.length >= 280
-    ? 36
-    : lines.length >= 180
-      ? 30
-      : lines.length >= 120
-        ? 26
-        : 22
+  const chunkSize = lines.length >= 360
+    ? 64
+    : lines.length >= 260
+      ? 56
+      : lines.length >= 180
+        ? 48
+        : 40
   const chunks: string[] = []
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'))
@@ -819,7 +819,7 @@ async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Prom
   let deepseekChunkCount = 0
   let ruleChunkCount = 0
 
-  const batchSize = chunks.length >= 9 ? 5 : chunks.length >= 6 ? 4 : 3
+  const batchSize = chunks.length <= 6 ? chunks.length : chunks.length <= 10 ? 6 : 7
 
   for (let i = 0; i < chunks.length; i += batchSize) {
     const batch = chunks.slice(i, i + batchSize)
@@ -1005,16 +1005,16 @@ function getDynamicAiBudget(
     .split(/[\n;]/)
     .map(line => line.trim())
     .filter(Boolean).length
-  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 40))
+  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 90))
 
   if (options?.chunkMode) {
-    const maxTokens = Math.max(768, Math.min(2304, 640 + estimatedItems * 20))
-    const timeoutMs = Math.max(12000, Math.min(24000, 9000 + estimatedItems * 220))
+    const maxTokens = Math.max(896, Math.min(3072, 768 + estimatedItems * 18))
+    const timeoutMs = Math.max(9000, Math.min(18000, 8000 + estimatedItems * 140))
     return { maxTokens, timeoutMs }
   }
 
-  const maxTokens = Math.max(1024, Math.min(4096, 768 + estimatedItems * 32))
-  const timeoutMs = Math.max(18000, Math.min(45000, 15000 + estimatedItems * 420))
+  const maxTokens = Math.max(1024, Math.min(4096, 768 + estimatedItems * 30))
+  const timeoutMs = Math.max(14000, Math.min(32000, 12000 + estimatedItems * 260))
 
   return { maxTokens, timeoutMs }
 }
