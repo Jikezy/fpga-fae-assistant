@@ -28,33 +28,31 @@ export async function POST(req: NextRequest) {
     const userRows = await sql`SELECT bom_api_key, bom_base_url, bom_model, ai_model, anthropic_api_key, anthropic_base_url FROM users WHERE id = ${authResult.user.id}`
     const bomConfig = userRows.length > 0 ? (() => {
       const user = userRows[0] as any
-      const aiModel = user.ai_model || ''
-      const aiBaseUrl = user.anthropic_base_url || ''
-      const bomModel = (user.bom_model || '').trim()
+      const trimValue = (value: unknown) => typeof value === 'string' ? value.trim() : ''
+
+      const bomApiKey = trimValue(user.bom_api_key)
+      const bomBaseUrl = trimValue(user.bom_base_url)
+      const bomModel = trimValue(user.bom_model)
+
+      const aiApiKey = trimValue(user.anthropic_api_key)
+      const aiBaseUrl = trimValue(user.anthropic_base_url)
+      const aiModel = trimValue(user.ai_model)
       const aiLooksDeepSeek = /deepseek/i.test(aiModel) || /deepseek/i.test(aiBaseUrl)
-      const preferAiConfig = aiLooksDeepSeek && !!user.anthropic_api_key
 
-      const primaryApiKey = preferAiConfig
-        ? user.anthropic_api_key
-        : user.bom_api_key || (aiLooksDeepSeek ? user.anthropic_api_key : undefined)
+      // BOM parsing always prefers BOM-specific credentials.
+      const primaryApiKey = bomApiKey || (aiLooksDeepSeek ? aiApiKey : '')
+      const primaryBaseUrl = bomBaseUrl || (!bomApiKey && aiLooksDeepSeek ? aiBaseUrl : '')
 
-      const primaryBaseUrl = preferAiConfig
-        ? user.anthropic_base_url || user.bom_base_url
-        : user.bom_base_url || (aiLooksDeepSeek ? user.anthropic_base_url : undefined)
+      const backupApiKey = bomApiKey && aiLooksDeepSeek && aiApiKey !== bomApiKey
+        ? aiApiKey
+        : undefined
+      const backupBaseUrl = backupApiKey ? aiBaseUrl : undefined
 
-      const backupApiKey = preferAiConfig
-        ? (user.bom_api_key && user.bom_api_key !== user.anthropic_api_key ? user.bom_api_key : undefined)
-        : (aiLooksDeepSeek && user.bom_api_key ? user.anthropic_api_key : undefined)
-
-      const backupBaseUrl = preferAiConfig
-        ? (user.bom_base_url || undefined)
-        : (aiLooksDeepSeek && user.bom_api_key ? user.anthropic_base_url : undefined)
-
-      const model = bomModel || (/deepseek/i.test(aiModel) ? aiModel : 'deepseek-chat')
+      const model = bomModel || (aiLooksDeepSeek && aiModel ? aiModel : 'deepseek-chat')
 
       return {
-        apiKey: primaryApiKey,
-        baseUrl: primaryBaseUrl,
+        apiKey: primaryApiKey || undefined,
+        baseUrl: primaryBaseUrl || undefined,
         backupApiKey,
         backupBaseUrl,
         model,

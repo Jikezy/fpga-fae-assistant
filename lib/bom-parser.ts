@@ -189,7 +189,7 @@ export async function parseBomText(
   let lastErrorReason = ''
 
   const activeCandidates = isChunkMode
-    ? candidates.slice(0, Math.min(1, candidates.length))
+    ? candidates.slice(0, Math.min(3, candidates.length))
     : candidates
 
   for (const candidate of activeCandidates) {
