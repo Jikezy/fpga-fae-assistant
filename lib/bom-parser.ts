@@ -291,6 +291,17 @@ export async function parseBomText(
     }
   }
 
+  if (!userConfig?.chunkMode && lastErrorReason.startsWith('timeout_')) {
+    const chunkRetryResult = await parseBomByChunks(text, userConfig, { force: true })
+    if (chunkRetryResult?.parseEngine === 'deepseek') {
+      chunkRetryResult.warnings = [
+        ...chunkRetryResult.warnings,
+        `AI retry via chunk after ${lastErrorReason}`
+      ]
+      return chunkRetryResult
+    }
+  }
+
   if (lastErrorReason) {
     fallbackResult.warnings.push(`AI fallback: ${lastErrorReason}`)
   }
@@ -791,20 +802,27 @@ function compactAiWarnings(warnings: string[]): string[] {
   return Array.from(new Set(aiWarnings))
 }
 
-async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Promise<ParseResult | null> {
+async function parseBomByChunks(
+  text: string,
+  userConfig?: BomParseConfig,
+  options?: { force?: boolean }
+): Promise<ParseResult | null> {
   const lines = splitBomTextLines(text)
-  const shouldChunk = lines.length >= 110 || (text.length >= 24000 && lines.length >= 60)
+  const shouldChunk = options?.force || lines.length >= 90 || text.length >= 18000
   if (!shouldChunk) {
     return null
   }
 
-  const chunkSize = lines.length >= 360
+  const baseChunkSize = lines.length >= 360
     ? 64
     : lines.length >= 260
       ? 56
       : lines.length >= 180
         ? 48
         : 40
+  const averageLineLength = Math.max(1, Math.ceil(text.length / Math.max(lines.length, 1)))
+  const sizeByTextDensity = Math.max(20, Math.floor(12000 / averageLineLength))
+  const chunkSize = Math.max(18, Math.min(baseChunkSize, sizeByTextDensity))
   const chunks: string[] = []
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'))
