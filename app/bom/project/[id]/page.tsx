@@ -61,7 +61,6 @@ export default function ProjectDetailPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [deletingSelected, setDeletingSelected] = useState(false)
   const [engineHint, setEngineHint] = useState<string | null>(null)
-  const [fallbackHint, setFallbackHint] = useState<string | null>(null)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [visitedItems, setVisitedItems] = useState<Set<string>>(new Set())
 
@@ -84,15 +83,6 @@ export default function ProjectDetailPage() {
       // 尝试从 localStorage 恢复
       const saved = localStorage.getItem(`bom-engine-${projectId}`)
       if (saved) setEngineHint(saved)
-    }
-
-    const fallbackReason = searchParams.get('fallback')
-    if (fallbackReason) {
-      setFallbackHint(fallbackReason)
-      localStorage.setItem(`bom-fallback-${projectId}`, fallbackReason)
-    } else {
-      const savedReason = localStorage.getItem(`bom-fallback-${projectId}`)
-      if (savedReason) setFallbackHint(savedReason)
     }
   }, [projectId]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -470,9 +460,6 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 <p className="text-sm text-gray-500">{items.length} 种元器件{visitedItems.size > 0 && ` · 已查看 ${visitedItems.size}/${items.length}`}</p>
-                {engineHint === 'rule' && fallbackHint && (
-                  <p className="text-xs text-red-500 mt-1">Fallback: {fallbackHint}</p>
-                )}
               </div>
             </div>
 
