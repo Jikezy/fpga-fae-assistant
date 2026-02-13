@@ -92,16 +92,25 @@ export async function parseBomText(
     let candidateBlocked = false
 
     for (const endpoint of endpoints) {
-      for (const model of modelCandidates) {
-        const modelTag = sanitizeModelName(model)
+      const attemptedModels = new Set<string>()
 
-        if (shouldSkipModelForEndpoint(endpoint, model)) {
+      for (const model of modelCandidates) {
+        const requestModel = normalizeModelForEndpoint(model, endpoint)
+        const requestModelKey = requestModel.toLowerCase()
+        if (attemptedModels.has(requestModelKey)) {
+          continue
+        }
+        attemptedModels.add(requestModelKey)
+
+        const modelTag = sanitizeModelName(requestModel)
+
+        if (shouldSkipModelForEndpoint(endpoint, requestModel)) {
           lastErrorReason = `model_cached_unavailable_${candidate.source}_${modelTag}`
           continue
         }
 
         try {
-          let requestBody = buildCompletionRequest(model, text, maxTokens, true)
+          let requestBody = buildCompletionRequest(requestModel, text, maxTokens, true)
           let response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -116,7 +125,7 @@ export async function parseBomText(
             let errText = await response.text()
 
             if (isUnsupportedResponseFormatError(response.status, errText)) {
-              requestBody = buildCompletionRequest(model, text, maxTokens, false)
+              requestBody = buildCompletionRequest(requestModel, text, maxTokens, false)
               response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -137,7 +146,7 @@ export async function parseBomText(
               console.error(
                 `DeepSeek API request failed (${candidate.source}):`,
                 response.status,
-                `model=${model}`,
+                `model=${requestModel}`,
                 `endpoint=${endpoint}`,
                 errText
               )
@@ -148,7 +157,7 @@ export async function parseBomText(
               }
 
               if (isModelNotSupported(response.status, errText)) {
-                markModelAsUnavailable(endpoint, model)
+                markModelAsUnavailable(endpoint, requestModel)
                 continue
               }
 
@@ -165,7 +174,7 @@ export async function parseBomText(
 
           if (!content) {
             lastErrorReason = `empty_content_${candidate.source}_${modelTag}`
-            console.error(`DeepSeek response content is empty (${candidate.source}, model=${model})`)
+            console.error(`DeepSeek response content is empty (${candidate.source}, model=${requestModel})`)
             continue
           }
 
@@ -175,13 +184,13 @@ export async function parseBomText(
             if (rescued.length > 0) {
               return {
                 items: rescued,
-                warnings: [`AI recovered via text fallback (${model})`],
+                warnings: [`AI recovered via text fallback (${requestModel})`],
                 parseEngine: 'deepseek',
               }
             }
 
             lastErrorReason = `json_extract_failed_${candidate.source}_${modelTag}`
-            console.error(`DeepSeek response does not contain valid JSON (${candidate.source}, model=${model})`)
+            console.error(`DeepSeek response does not contain valid JSON (${candidate.source}, model=${requestModel})`)
             continue
           }
 
@@ -191,13 +200,13 @@ export async function parseBomText(
             if (rescued.length > 0) {
               return {
                 items: rescued,
-                warnings: [...parsed.warnings, `AI recovered via text fallback (${model})`],
+                warnings: [...parsed.warnings, `AI recovered via text fallback (${requestModel})`],
                 parseEngine: 'deepseek',
               }
             }
 
             lastErrorReason = `no_items_${candidate.source}_${modelTag}`
-            console.error(`DeepSeek response has no valid items (${candidate.source}, model=${model})`)
+            console.error(`DeepSeek response has no valid items (${candidate.source}, model=${requestModel})`)
             continue
           }
 
@@ -208,7 +217,7 @@ export async function parseBomText(
           }
         } catch (error) {
           lastErrorReason = `exception_${candidate.source}_${modelTag}`
-          console.error(`DeepSeek parse exception (${candidate.source}, model=${model}):`, error)
+          console.error(`DeepSeek parse exception (${candidate.source}, model=${requestModel}):`, error)
           if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
             lastErrorReason = `timeout_${candidate.source}_${modelTag}`
           }
@@ -254,6 +263,30 @@ function buildModelCandidates(preferredModel?: string, envModel?: string): strin
   }
 
   return unique
+}
+
+function normalizeModelForEndpoint(model: string, endpoint: string): string {
+  const normalizedEndpoint = endpoint.toLowerCase()
+  const normalizedModel = model.trim().toLowerCase()
+
+  if (!normalizedEndpoint.includes('api.deepseek.com')) {
+    return model
+  }
+
+  if (normalizedModel === 'deepseek-chat' || normalizedModel === 'deepseek-reasoner') {
+    return model
+  }
+
+  if (
+    normalizedModel === 'deepseek-v3' ||
+    normalizedModel === 'deepseek-v3.2' ||
+    normalizedModel === 'deepseek-ai/deepseek-v3' ||
+    normalizedModel === 'deepseek-ai/deepseek-v3.2'
+  ) {
+    return 'deepseek-chat'
+  }
+
+  return model
 }
 
 function sanitizeModelName(model: string): string {
