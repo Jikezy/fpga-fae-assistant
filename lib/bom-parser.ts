@@ -808,7 +808,7 @@ async function parseBomByChunks(
   options?: { force?: boolean }
 ): Promise<ParseResult | null> {
   const lines = splitBomTextLines(text)
-  const shouldChunk = options?.force || lines.length >= 90 || text.length >= 18000
+  const shouldChunk = options?.force || lines.length >= 50 || text.length >= 9000
   if (!shouldChunk) {
     return null
   }
@@ -819,10 +819,12 @@ async function parseBomByChunks(
       ? 56
       : lines.length >= 180
         ? 48
-        : 40
+        : lines.length >= 120
+          ? 40
+          : 28
   const averageLineLength = Math.max(1, Math.ceil(text.length / Math.max(lines.length, 1)))
-  const sizeByTextDensity = Math.max(20, Math.floor(12000 / averageLineLength))
-  const chunkSize = Math.max(18, Math.min(baseChunkSize, sizeByTextDensity))
+  const sizeByTextDensity = Math.max(16, Math.floor(9000 / averageLineLength))
+  const chunkSize = Math.max(16, Math.min(baseChunkSize, sizeByTextDensity))
   const chunks: string[] = []
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'))
@@ -1026,8 +1028,8 @@ function getDynamicAiBudget(
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 90))
 
   if (options?.chunkMode) {
-    const maxTokens = Math.max(896, Math.min(3072, 768 + estimatedItems * 18))
-    const timeoutMs = Math.max(9000, Math.min(18000, 8000 + estimatedItems * 140))
+    const maxTokens = Math.max(960, Math.min(3072, 896 + estimatedItems * 22))
+    const timeoutMs = Math.max(12000, Math.min(22000, 10000 + estimatedItems * 180))
     return { maxTokens, timeoutMs }
   }
 
