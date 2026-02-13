@@ -314,6 +314,11 @@ function markModelAsUnavailable(endpoint: string, model: string): void {
 
 function buildCompletionEndpointCandidates(baseUrl: string): string[] {
   const normalized = baseUrl.replace(/\/+$/, '')
+
+  if (isOfficialDeepSeekBase(normalized)) {
+    return [`${normalized}/chat/completions`]
+  }
+
   const candidates = [`${normalized}/chat/completions`]
 
   if (!/\/v\d+$/i.test(normalized)) {
@@ -321,6 +326,15 @@ function buildCompletionEndpointCandidates(baseUrl: string): string[] {
   }
 
   return Array.from(new Set(candidates))
+}
+
+function isOfficialDeepSeekBase(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl)
+    return /(^|\.)api\.deepseek\.com$/i.test(url.hostname)
+  } catch {
+    return /(^|\.)api\.deepseek\.com(?:$|\/)/i.test(baseUrl)
+  }
 }
 
 function buildCompletionRequest(model: string, text: string, maxTokens: number, strictJson: boolean): Record<string, unknown> {
@@ -674,10 +688,10 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
     .split(/[\n;]/)
     .map(line => line.trim())
     .filter(Boolean).length
-  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 28))
+  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 36))
 
-  const maxTokens = Math.max(768, Math.min(4096, 384 + estimatedItems * 52))
-  const timeoutMs = Math.max(9000, Math.min(30000, 7500 + estimatedItems * 220))
+  const maxTokens = Math.max(768, Math.min(3072, 512 + estimatedItems * 36))
+  const timeoutMs = Math.max(18000, Math.min(45000, 18000 + estimatedItems * 360))
 
   return { maxTokens, timeoutMs }
 }

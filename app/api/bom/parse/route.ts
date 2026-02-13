@@ -4,7 +4,7 @@ import { parseBomText } from '@/lib/bom-parser'
 import { createProject, addItems } from '@/lib/bom-db'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
 
 /**
  * POST /api/bom/parse
