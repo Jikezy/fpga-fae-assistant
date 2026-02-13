@@ -1,3 +1,5 @@
+import { createHash } from 'crypto'
+
 /**
  * BOM 解析引擎
  * 使用 DeepSeek AI（免费）将用户输入的自然语言/文本解析为结构化元器件列表
@@ -39,8 +41,78 @@ Rules:
 - If uncertain, keep best guess and add a short warning.
 Output JSON only.`
 
+const BOM_CHUNK_SYSTEM_PROMPT = `Parse BOM lines for electronic components. Return JSON array only:
+[{"name":"","spec":"","quantity":1,"searchKeyword":"","category":""}]
+Rules: one item per line; quantity integer >=1; keep model/package codes; generic terms in Simplified Chinese; concise searchKeyword; category in chip/capacitor/resistor/inductor/diode/transistor/module/connector/cable/tool/other.`
+
 const MODEL_SKIP_CACHE_TTL_MS = 30 * 60 * 1000
+const BOM_PARSE_CACHE_TTL_MS = 15 * 60 * 1000
+const BOM_PARSE_CACHE_MAX_ENTRIES = 300
 const modelSkipCache = new Map<string, number>()
+const bomParseCache = new Map<string, { expiresAt: number; result: ParseResult }>()
+
+function cloneParseResult(result: ParseResult): ParseResult {
+  return {
+    items: result.items.map(item => ({ ...item })),
+    warnings: [...result.warnings],
+    parseEngine: result.parseEngine,
+  }
+}
+
+function stableHash(value: string): string {
+  return createHash('sha1').update(value).digest('hex')
+}
+
+function fingerprintSecret(secret?: string): string {
+  const trimmed = secret?.trim()
+  if (!trimmed) return 'none'
+  return stableHash(trimmed).slice(0, 12)
+}
+
+function buildParseCacheKey(text: string, userConfig?: BomParseConfig): string {
+  const model = (userConfig?.model || process.env.DEEPSEEK_MODEL || '').trim().toLowerCase()
+  const baseUrl = normalizeBaseUrl(userConfig?.baseUrl) || ''
+  const backupBaseUrl = normalizeBaseUrl(userConfig?.backupBaseUrl) || ''
+  const apiSecret = userConfig?.apiKey?.trim() || process.env.DEEPSEEK_API_KEY?.trim() || ''
+  const backupSecret = userConfig?.backupApiKey?.trim() || ''
+  const textHash = stableHash(text)
+
+  return [
+    `text:${textHash}`,
+    `chunk:${userConfig?.chunkMode ? '1' : '0'}`,
+    `model:${model || 'default'}`,
+    `base:${baseUrl || 'default'}`,
+    `backupBase:${backupBaseUrl || 'none'}`,
+    `key:${fingerprintSecret(apiSecret)}`,
+    `backupKey:${fingerprintSecret(backupSecret)}`,
+  ].join('|')
+}
+
+function getCachedParseResult(cacheKey: string): ParseResult | null {
+  const cached = bomParseCache.get(cacheKey)
+  if (!cached) return null
+
+  if (Date.now() > cached.expiresAt) {
+    bomParseCache.delete(cacheKey)
+    return null
+  }
+
+  return cloneParseResult(cached.result)
+}
+
+function cacheDeepseekResult(cacheKey: string, result: ParseResult): void {
+  if (result.parseEngine !== 'deepseek') return
+
+  if (bomParseCache.size >= BOM_PARSE_CACHE_MAX_ENTRIES) {
+    const oldestKey = bomParseCache.keys().next().value
+    if (typeof oldestKey === 'string') bomParseCache.delete(oldestKey)
+  }
+
+  bomParseCache.set(cacheKey, {
+    expiresAt: Date.now() + BOM_PARSE_CACHE_TTL_MS,
+    result: cloneParseResult(result),
+  })
+}
 
 /**
  * 使用 DeepSeek AI 解析 BOM 文本
@@ -61,12 +133,25 @@ export async function parseBomText(
   const activeModelCandidates = isChunkMode
     ? modelCandidates.slice(0, Math.min(2, modelCandidates.length))
     : modelCandidates
+  const cacheKey = buildParseCacheKey(text, userConfig)
+  const cachedResult = getCachedParseResult(cacheKey)
+  if (cachedResult) {
+    return cachedResult
+  }
+
   const { maxTokens, timeoutMs } = getDynamicAiBudget(text, { chunkMode: isChunkMode })
   const fallbackResult = ruleBasedParse(text)
+  const returnDeepseek = (result: ParseResult): ParseResult => {
+    cacheDeepseekResult(cacheKey, result)
+    return result
+  }
 
   if (!userConfig?.chunkMode) {
     const chunkedResult = await parseBomByChunks(text, userConfig)
     if (chunkedResult) {
+      if (chunkedResult.parseEngine === 'deepseek') {
+        return returnDeepseek(chunkedResult)
+      }
       return chunkedResult
     }
   }
@@ -134,7 +219,7 @@ export async function parseBomText(
 
         try {
           const useStrictJson = !isChunkMode
-          let requestBody = buildCompletionRequest(requestModel, text, maxTokens, useStrictJson)
+          let requestBody = buildCompletionRequest(requestModel, text, maxTokens, useStrictJson, { chunkMode: isChunkMode })
           let response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -149,7 +234,7 @@ export async function parseBomText(
             let errText = await response.text()
 
             if (useStrictJson && isUnsupportedResponseFormatError(response.status, errText)) {
-              requestBody = buildCompletionRequest(requestModel, text, maxTokens, false)
+              requestBody = buildCompletionRequest(requestModel, text, maxTokens, false, { chunkMode: isChunkMode })
               response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -214,11 +299,11 @@ export async function parseBomText(
               if (mergedItems.length > rescuedJsonLike.length) {
                 recoveredWarnings.push('AI supplemented with rule coverage')
               }
-              return {
+              return returnDeepseek({
                 items: mergedItems,
                 warnings: recoveredWarnings,
                 parseEngine: 'deepseek',
-              }
+              })
             }
 
             const rescued = deriveItemsFromAiText(content)
@@ -228,11 +313,11 @@ export async function parseBomText(
               if (mergedItems.length > rescued.length) {
                 recoveredWarnings.push('AI supplemented with rule coverage')
               }
-              return {
+              return returnDeepseek({
                 items: mergedItems,
                 warnings: recoveredWarnings,
                 parseEngine: 'deepseek',
-              }
+              })
             }
 
             lastErrorReason = finishReason === 'length'
@@ -251,11 +336,11 @@ export async function parseBomText(
               if (mergedItems.length > rescuedJsonLike.length) {
                 recoveredWarnings.push('AI supplemented with rule coverage')
               }
-              return {
+              return returnDeepseek({
                 items: mergedItems,
                 warnings: recoveredWarnings,
                 parseEngine: 'deepseek',
-              }
+              })
             }
 
             const rescued = deriveItemsFromAiText(content)
@@ -265,11 +350,11 @@ export async function parseBomText(
               if (mergedItems.length > rescued.length) {
                 recoveredWarnings.push('AI supplemented with rule coverage')
               }
-              return {
+              return returnDeepseek({
                 items: mergedItems,
                 warnings: recoveredWarnings,
                 parseEngine: 'deepseek',
-              }
+              })
             }
 
             lastErrorReason = `no_items_${candidate.source}_${modelTag}`
@@ -283,11 +368,11 @@ export async function parseBomText(
             mergedWarnings.push('AI supplemented with rule coverage')
           }
 
-          return {
+          return returnDeepseek({
             items: mergedItems,
             warnings: mergedWarnings,
             parseEngine: 'deepseek',
-          }
+          })
         } catch (error) {
           lastErrorReason = `exception_${candidate.source}_${modelTag}`
           console.error(`DeepSeek parse exception (${candidate.source}, model=${requestModel}):`, error)
@@ -310,7 +395,7 @@ export async function parseBomText(
         ...chunkRetryResult.warnings,
         `AI retry via chunk after ${lastErrorReason}`
       ]
-      return chunkRetryResult
+      return returnDeepseek(chunkRetryResult)
     }
   }
 
@@ -421,15 +506,22 @@ function isOfficialDeepSeekBase(baseUrl: string): boolean {
   }
 }
 
-function buildCompletionRequest(model: string, text: string, maxTokens: number, strictJson: boolean): Record<string, unknown> {
+function buildCompletionRequest(
+  model: string,
+  text: string,
+  maxTokens: number,
+  strictJson: boolean,
+  options?: { chunkMode?: boolean }
+): Record<string, unknown> {
+  const chunkMode = options?.chunkMode === true
   const payload: Record<string, unknown> = {
     model,
     messages: [
-      { role: 'system', content: BOM_SYSTEM_PROMPT },
+      { role: 'system', content: chunkMode ? BOM_CHUNK_SYSTEM_PROMPT : BOM_SYSTEM_PROMPT },
       { role: 'user', content: text },
     ],
     max_tokens: maxTokens,
-    temperature: 0.1,
+    temperature: chunkMode ? 0 : 0.1,
   }
 
   if (strictJson) {
@@ -780,6 +872,40 @@ function splitBomTextLines(text: string): string[] {
     .filter(Boolean)
 }
 
+function compactBomLineForAi(line: string): string {
+  const compacted = line.replace(/\s+/g, ' ').trim()
+  if (compacted.length <= 260) return compacted
+
+  const withoutRefs = compacted.replace(
+    /\b[A-Z]{1,3}\d+(?:\s*[,/]\s*[A-Z]{1,3}\d+){3,}\b/g,
+    match => `${match.split(/[,/]/)[0]} ...`
+  )
+
+  if (withoutRefs.length <= 260) return withoutRefs
+
+  const segments = withoutRefs
+    .split(/\s*[|,;]\s*/)
+    .map(segment => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length > 1) {
+    const picked: string[] = []
+    let totalLength = 0
+
+    for (const segment of segments) {
+      if (totalLength + segment.length > 240) break
+      picked.push(segment)
+      totalLength += segment.length + 1
+    }
+
+    if (picked.length > 0) {
+      return picked.join(' ')
+    }
+  }
+
+  return withoutRefs.slice(0, 240).trim()
+}
+
 function mergeBomItemsWithQuantity(items: BomItem[]): BomItem[] {
   const merged = new Map<string, BomItem>()
 
@@ -825,6 +951,9 @@ async function parseBomByChunks(
     return null
   }
 
+  const compactedLines = lines.map(compactBomLineForAi)
+  const compactedTextLength = compactedLines.reduce((total, line) => total + line.length, 0)
+
   const baseChunkSize = lines.length >= 360
     ? 64
     : lines.length >= 260
@@ -834,12 +963,12 @@ async function parseBomByChunks(
         : lines.length >= 120
           ? 40
           : 28
-  const averageLineLength = Math.max(1, Math.ceil(text.length / Math.max(lines.length, 1)))
-  const sizeByTextDensity = Math.max(8, Math.floor(5000 / averageLineLength))
+  const averageLineLength = Math.max(1, Math.ceil(compactedTextLength / Math.max(compactedLines.length, 1)))
+  const sizeByTextDensity = Math.max(8, Math.floor(4800 / averageLineLength))
   const chunkSize = Math.max(8, Math.min(baseChunkSize, sizeByTextDensity))
   const chunks: string[] = []
-  for (let i = 0; i < lines.length; i += chunkSize) {
-    chunks.push(lines.slice(i, i + chunkSize).join('\n'))
+  for (let i = 0; i < compactedLines.length; i += chunkSize) {
+    chunks.push(compactedLines.slice(i, i + chunkSize).join('\n'))
   }
 
   if (chunks.length <= 1) {
