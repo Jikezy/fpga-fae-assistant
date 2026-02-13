@@ -18,6 +18,15 @@ export interface ParseResult {
   parseEngine: 'deepseek' | 'rule' // 解析引擎：deepseek AI 或规则降级
 }
 
+type BomParseConfig = {
+  apiKey?: string
+  baseUrl?: string
+  model?: string
+  backupApiKey?: string
+  backupBaseUrl?: string
+  chunkMode?: boolean
+}
+
 const BOM_SYSTEM_PROMPT = `You are a BOM parser for electronic components.
 Return ONLY valid JSON (no markdown, no code fences, no explanation) with this schema:
 {"items":[{"name":"","spec":"","quantity":1,"searchKeyword":"","category":""}],"warnings":[]}
@@ -38,7 +47,7 @@ const modelSkipCache = new Map<string, number>()
  */
 export async function parseBomText(
   text: string,
-  userConfig?: { apiKey?: string; baseUrl?: string; model?: string; backupApiKey?: string; backupBaseUrl?: string }
+  userConfig?: BomParseConfig
 ): Promise<ParseResult> {
   const userApiKey = userConfig?.apiKey?.trim()
   const envApiKey = process.env.DEEPSEEK_API_KEY?.trim()
@@ -49,6 +58,13 @@ export async function parseBomText(
   const modelCandidates = buildModelCandidates(userConfig?.model, process.env.DEEPSEEK_MODEL)
   const { maxTokens, timeoutMs } = getDynamicAiBudget(text)
   const fallbackResult = ruleBasedParse(text)
+
+  if (!userConfig?.chunkMode) {
+    const chunkedResult = await parseBomByChunks(text, userConfig)
+    if (chunkedResult) {
+      return chunkedResult
+    }
+  }
 
   const candidates: Array<{ apiKey: string; baseUrl: string; source: string }> = []
 
@@ -727,6 +743,120 @@ function normalizeBomKeyToken(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+function splitBomTextLines(text: string): string[] {
+  return text
+    .split(/[\n;]/)
+    .map(line => line.trim())
+    .filter(Boolean)
+}
+
+function mergeBomItemsWithQuantity(items: BomItem[]): BomItem[] {
+  const merged = new Map<string, BomItem>()
+
+  for (const item of items) {
+    const normalizedItem: BomItem = {
+      ...item,
+      quantity: Math.max(1, Number.isFinite(item.quantity) ? item.quantity : 1),
+    }
+
+    const key = buildBomItemKey(normalizedItem)
+    const existing = merged.get(key)
+    if (!existing) {
+      merged.set(key, normalizedItem)
+      continue
+    }
+
+    existing.quantity += normalizedItem.quantity
+    if ((!existing.spec || existing.spec === '') && normalizedItem.spec) existing.spec = normalizedItem.spec
+    if ((!existing.searchKeyword || existing.searchKeyword === '') && normalizedItem.searchKeyword) {
+      existing.searchKeyword = normalizedItem.searchKeyword
+    }
+    if ((!existing.category || existing.category === '\u5176\u4ed6') && normalizedItem.category) {
+      existing.category = normalizedItem.category
+    }
+  }
+
+  return Array.from(merged.values())
+}
+
+function compactAiWarnings(warnings: string[]): string[] {
+  const aiWarnings = warnings.filter(w => w.startsWith('AI '))
+  return Array.from(new Set(aiWarnings))
+}
+
+async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Promise<ParseResult | null> {
+  const lines = splitBomTextLines(text)
+  if (lines.length < 36) {
+    return null
+  }
+
+  const chunkSize = 14
+  const chunks: string[] = []
+  for (let i = 0; i < lines.length; i += chunkSize) {
+    chunks.push(lines.slice(i, i + chunkSize).join('\n'))
+  }
+
+  if (chunks.length <= 1) {
+    return null
+  }
+
+  const collectedItems: BomItem[] = []
+  const collectedWarnings: string[] = []
+  let deepseekChunkCount = 0
+  let ruleChunkCount = 0
+
+  for (let i = 0; i < chunks.length; i += 2) {
+    const batch = chunks.slice(i, i + 2)
+    const batchResults = await Promise.all(
+      batch.map(async (chunk, offset) => {
+        const chunkIndex = i + offset + 1
+        const result = await parseBomText(chunk, { ...userConfig, chunkMode: true })
+        return { chunkIndex, result }
+      })
+    )
+
+    for (const { chunkIndex, result } of batchResults) {
+      collectedItems.push(...result.items)
+
+      if (result.parseEngine === 'deepseek') {
+        deepseekChunkCount += 1
+      } else {
+        ruleChunkCount += 1
+      }
+
+      const aiWarnings = compactAiWarnings(result.warnings)
+      for (const warning of aiWarnings) {
+        collectedWarnings.push(`chunk${chunkIndex}: ${warning}`)
+      }
+    }
+  }
+
+  if (collectedItems.length === 0) {
+    return null
+  }
+
+  const mergedItems = mergeBomItemsWithQuantity(collectedItems)
+  const mergedWarnings = Array.from(new Set(collectedWarnings))
+
+  if (deepseekChunkCount > 0) {
+    if (ruleChunkCount > 0) {
+      mergedWarnings.push(`AI partial chunk fallback: ${ruleChunkCount}/${chunks.length}`)
+    }
+
+    return {
+      items: mergedItems,
+      warnings: mergedWarnings,
+      parseEngine: 'deepseek',
+    }
+  }
+
+  return {
+    items: mergedItems,
+    warnings: mergedWarnings,
+    parseEngine: 'rule',
+  }
+}
+
 function isJsonArtifactLine(line: string): boolean {
   const trimmed = line.trim()
   if (!trimmed) return true
@@ -857,7 +987,7 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 40))
 
   const maxTokens = Math.max(1024, Math.min(4096, 768 + estimatedItems * 32))
-  const timeoutMs = Math.max(22000, Math.min(65000, 18000 + estimatedItems * 520))
+  const timeoutMs = Math.max(28000, Math.min(70000, 22000 + estimatedItems * 560))
 
   return { maxTokens, timeoutMs }
 }
