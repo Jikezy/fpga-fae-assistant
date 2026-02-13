@@ -688,10 +688,10 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
     .split(/[\n;]/)
     .map(line => line.trim())
     .filter(Boolean).length
-  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 36))
+  const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 40))
 
-  const maxTokens = Math.max(768, Math.min(3072, 512 + estimatedItems * 36))
-  const timeoutMs = Math.max(18000, Math.min(45000, 18000 + estimatedItems * 360))
+  const maxTokens = Math.max(768, Math.min(2048, 512 + estimatedItems * 24))
+  const timeoutMs = Math.max(30000, Math.min(90000, 25000 + estimatedItems * 700))
 
   return { maxTokens, timeoutMs }
 }

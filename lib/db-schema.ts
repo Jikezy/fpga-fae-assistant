@@ -171,6 +171,9 @@ export async function initializeDatabase() {
     await sql`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_base_url TEXT
     `
+    await sql`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_model TEXT
+    `
 
     console.log('数据库表初始化成功（含BOM模块）')
     return { success: true }
@@ -204,6 +207,7 @@ export async function ensureAiModelColumn() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS api_format TEXT DEFAULT 'auto'`
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_api_key TEXT`
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_base_url TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS bom_model TEXT`
     _aiModelMigrated = true
   } catch (e) {
     console.error('ai_model/api_format 列迁移失败:', e)

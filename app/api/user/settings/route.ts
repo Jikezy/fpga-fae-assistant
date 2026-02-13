@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     await ensureAiModelColumn()
     const sql = getSql()
     const result = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format, bom_api_key, bom_base_url
+      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format, bom_api_key, bom_base_url, bom_model
       FROM users
       WHERE id = ${authResult.user.id}
     `
@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
       hasBomKey: !!user.bom_api_key,
       maskedBomKey,
       bomBaseUrl: user.bom_base_url || '',
+      bomModel: user.bom_model || 'deepseek-chat',
     })
   } catch (error) {
     console.error('获取API配置失败:', error)
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { api_key, base_url, model_name, api_format, bom_api_key, bom_base_url } = await req.json()
+    const { api_key, base_url, model_name, api_format, bom_api_key, bom_base_url, bom_model } = await req.json()
 
     await ensureAiModelColumn()
 
@@ -136,6 +137,9 @@ export async function POST(req: NextRequest) {
     if (bom_base_url !== undefined) {
       await sql`UPDATE users SET bom_base_url = ${bom_base_url || null} WHERE id = ${authResult.user.id}`
     }
+    if (bom_model !== undefined) {
+      await sql`UPDATE users SET bom_model = ${bom_model || 'deepseek-chat'} WHERE id = ${authResult.user.id}`
+    }
     if (bom_api_key !== undefined && bom_api_key !== '' && bom_api_key !== '__KEEP_EXISTING__') {
       await sql`UPDATE users SET bom_api_key = ${bom_api_key} WHERE id = ${authResult.user.id}`
     }
@@ -173,7 +177,8 @@ export async function DELETE(req: NextRequest) {
         ai_model = NULL,
         api_format = 'auto',
         bom_api_key = NULL,
-        bom_base_url = NULL
+        bom_base_url = NULL,
+        bom_model = NULL
       WHERE id = ${authResult.user.id}
     `
 

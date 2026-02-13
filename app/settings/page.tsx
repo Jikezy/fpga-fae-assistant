@@ -21,6 +21,7 @@ export default function SettingsPage() {
   const [apiFormat, setApiFormat] = useState('auto')
   const [bomApiKey, setBomApiKey] = useState('')
   const [bomBaseUrl, setBomBaseUrl] = useState('')
+  const [bomModel, setBomModel] = useState('deepseek-chat')
   const [hasBomKey, setHasBomKey] = useState(false)
   const [maskedBomKey, setMaskedBomKey] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -56,6 +57,7 @@ export default function SettingsPage() {
         setHasBomKey(data.hasBomKey || false)
         setMaskedBomKey(data.maskedBomKey || '')
         setBomBaseUrl(data.bomBaseUrl || '')
+        setBomModel(data.bomModel || 'deepseek-chat')
       }
     } catch (error) {
       console.error('加载设置失败:', error)
@@ -94,6 +96,7 @@ export default function SettingsPage() {
         model_name: modelName,
         api_format: apiFormat,
         bom_base_url: bomBaseUrl,
+        bom_model: bomModel || 'deepseek-chat',
       }
       // 如果用户输入了新 key 则发送；否则仍需发送旧占位（后端需要非空）
       if (apiKey.trim()) {
@@ -345,6 +348,23 @@ export default function SettingsPage() {
                 placeholder="留空使用默认 https://api.deepseek.com"
                 className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100 placeholder-gray-400"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-100 mb-2">
+                DeepSeek BOM Model
+              </label>
+              <select
+                value={bomModel}
+                onChange={(e) => setBomModel(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100"
+              >
+                <option value="deepseek-chat">deepseek-chat (V3.2 standard)</option>
+                <option value="deepseek-reasoner">deepseek-reasoner (V3.2 reasoning)</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-2">
+                Recommended: deepseek-chat for faster BOM parsing.
+              </p>
             </div>
 
             <div>

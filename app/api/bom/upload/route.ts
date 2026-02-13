@@ -77,11 +77,12 @@ export async function POST(req: NextRequest) {
     const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
     await ensureAiModelColumn()
     const sql = getSql()
-    const userRows = await sql`SELECT bom_api_key, bom_base_url, ai_model, anthropic_api_key, anthropic_base_url FROM users WHERE id = ${authResult.user.id}`
+    const userRows = await sql`SELECT bom_api_key, bom_base_url, bom_model, ai_model, anthropic_api_key, anthropic_base_url FROM users WHERE id = ${authResult.user.id}`
     const bomConfig = userRows.length > 0 ? (() => {
       const user = userRows[0] as any
       const aiModel = user.ai_model || ''
       const aiBaseUrl = user.anthropic_base_url || ''
+      const bomModel = (user.bom_model || '').trim()
       const aiLooksDeepSeek = /deepseek/i.test(aiModel) || /deepseek/i.test(aiBaseUrl)
       const preferAiConfig = aiLooksDeepSeek && !!user.anthropic_api_key
 
@@ -101,12 +102,14 @@ export async function POST(req: NextRequest) {
         ? (user.bom_base_url || undefined)
         : (aiLooksDeepSeek && user.bom_api_key ? user.anthropic_base_url : undefined)
 
+      const model = bomModel || (/deepseek/i.test(aiModel) ? aiModel : 'deepseek-chat')
+
       return {
         apiKey: primaryApiKey,
         baseUrl: primaryBaseUrl,
         backupApiKey,
         backupBaseUrl,
-        model: /deepseek/i.test(aiModel) ? aiModel : undefined,
+        model,
       }
     })() : undefined
 
