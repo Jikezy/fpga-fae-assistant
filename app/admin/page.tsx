@@ -10,6 +10,37 @@ interface User {
   createdAt: string
 }
 
+interface OpsTableStat {
+  tableName: string
+  bytes: number
+  pretty: string
+  rowEstimate: number
+}
+
+interface OpsMetrics {
+  generatedAt: string
+  summary: {
+    users: number
+    sessions: number
+    documents: number
+    bomProjects: number
+    bomItems: number
+    activePriceCache: number
+    bomProjects24h: number
+    bomItems24h: number
+  }
+  database: {
+    name: string
+    bytes: number
+    pretty: string
+  }
+  pressure: {
+    usagePercentOfHalfGb: number
+    level: 'low' | 'medium' | 'high' | 'critical'
+  }
+  tables: OpsTableStat[]
+}
+
 export default function AdminPage() {
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
@@ -17,10 +48,14 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [migrating, setMigrating] = useState(false)
   const [migrateMessage, setMigrateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [opsMetrics, setOpsMetrics] = useState<OpsMetrics | null>(null)
+  const [opsLoading, setOpsLoading] = useState(false)
+  const [opsError, setOpsError] = useState<string | null>(null)
 
   useEffect(() => {
     checkAuth()
     loadUsers()
+    loadOps()
   }, [])
 
   const checkAuth = async () => {
@@ -53,6 +88,24 @@ export default function AdminPage() {
       console.error('加载用户失败:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadOps = async () => {
+    try {
+      setOpsLoading(true)
+      setOpsError(null)
+      const response = await fetch('/api/admin/ops')
+      if (!response.ok) {
+        throw new Error('load ops failed')
+      }
+      const data = await response.json()
+      setOpsMetrics(data)
+    } catch (error) {
+      console.error('load ops failed:', error)
+      setOpsError('Failed to load ops dashboard')
+    } finally {
+      setOpsLoading(false)
     }
   }
 
@@ -114,6 +167,8 @@ export default function AdminPage() {
       minute: '2-digit',
     })
   }
+
+  const formatCount = (value: number) => value.toLocaleString('zh-CN')
 
   const handleDatabaseMigrate = async () => {
     if (!confirm('确定要执行数据库迁移吗？这将为用户表添加API配置字段。')) {
@@ -229,6 +284,76 @@ export default function AdminPage() {
         </div>
 
         {/* 数据库工具 */}
+        <div className="bg-white rounded-lg shadow p-6 mb-8">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Ops Dashboard (Admin only)</h2>
+            <button
+              onClick={loadOps}
+              disabled={opsLoading}
+              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {opsLoading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+
+          {opsError && (
+            <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {opsError}
+            </div>
+          )}
+
+          {opsMetrics && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <p className="text-xs text-gray-500">BOM projects (24h)</p>
+                  <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.bomProjects24h)}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <p className="text-xs text-gray-500">BOM items (24h)</p>
+                  <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.bomItems24h)}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <p className="text-xs text-gray-500">Active price cache</p>
+                  <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.activePriceCache)}</p>
+                </div>
+                <div className="rounded-lg border border-gray-200 p-4">
+                  <p className="text-xs text-gray-500">Database size</p>
+                  <p className="text-2xl font-semibold text-gray-900">{opsMetrics.database.pretty}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Free 0.5GB usage: {opsMetrics.pressure.usagePercentOfHalfGb}%
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-gray-500">
+                      <th className="text-left py-2 pr-4">Table</th>
+                      <th className="text-left py-2 pr-4">Rows (estimate)</th>
+                      <th className="text-left py-2">Storage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {opsMetrics.tables.map((table) => (
+                      <tr key={table.tableName} className="border-b border-gray-100">
+                        <td className="py-2 pr-4 text-gray-900">{table.tableName}</td>
+                        <td className="py-2 pr-4 text-gray-600">{formatCount(table.rowEstimate)}</td>
+                        <td className="py-2 text-gray-600">{table.pretty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-3">
+                Updated at: {new Date(opsMetrics.generatedAt).toLocaleString('zh-CN')}
+              </p>
+            </>
+          )}
+        </div>
+
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">数据库工具</h2>
 
