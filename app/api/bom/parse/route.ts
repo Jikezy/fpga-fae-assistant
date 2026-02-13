@@ -31,15 +31,29 @@ export async function POST(req: NextRequest) {
       const aiModel = user.ai_model || ''
       const aiBaseUrl = user.anthropic_base_url || ''
       const aiLooksDeepSeek = /deepseek/i.test(aiModel) || /deepseek/i.test(aiBaseUrl)
+      const preferAiConfig = aiLooksDeepSeek && !!user.anthropic_api_key
 
-      const fallbackApiKey = aiLooksDeepSeek && user.bom_api_key ? user.anthropic_api_key : undefined
-      const fallbackBaseUrl = aiLooksDeepSeek && user.bom_api_key ? user.anthropic_base_url : undefined
+      const primaryApiKey = preferAiConfig
+        ? user.anthropic_api_key
+        : user.bom_api_key || (aiLooksDeepSeek ? user.anthropic_api_key : undefined)
+
+      const primaryBaseUrl = preferAiConfig
+        ? user.anthropic_base_url || user.bom_base_url
+        : user.bom_base_url || (aiLooksDeepSeek ? user.anthropic_base_url : undefined)
+
+      const backupApiKey = preferAiConfig
+        ? (user.bom_api_key && user.bom_api_key !== user.anthropic_api_key ? user.bom_api_key : undefined)
+        : (aiLooksDeepSeek && user.bom_api_key ? user.anthropic_api_key : undefined)
+
+      const backupBaseUrl = preferAiConfig
+        ? (user.bom_base_url || undefined)
+        : (aiLooksDeepSeek && user.bom_api_key ? user.anthropic_base_url : undefined)
 
       return {
-        apiKey: user.bom_api_key || (aiLooksDeepSeek ? user.anthropic_api_key : undefined),
-        baseUrl: user.bom_base_url || (aiLooksDeepSeek ? user.anthropic_base_url : undefined),
-        backupApiKey: fallbackApiKey,
-        backupBaseUrl: fallbackBaseUrl,
+        apiKey: primaryApiKey,
+        baseUrl: primaryBaseUrl,
+        backupApiKey,
+        backupBaseUrl,
         model: /deepseek/i.test(aiModel) ? aiModel : undefined,
       }
     })() : undefined
