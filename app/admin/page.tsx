@@ -65,6 +65,7 @@ export default function AdminPage() {
   const [opsMetrics, setOpsMetrics] = useState<OpsMetrics | null>(null)
   const [opsLoading, setOpsLoading] = useState(false)
   const [opsError, setOpsError] = useState<string | null>(null)
+  const [clearingUserId, setClearingUserId] = useState<string | null>(null)
 
   useEffect(() => {
     checkAuth()
@@ -168,6 +169,47 @@ export default function AdminPage() {
     } catch (error) {
       console.error('删除用户失败:', error)
       alert('删除失败，请重试')
+    }
+  }
+
+
+  const handleClearUserData = async (userId: string, email: string) => {
+    if (!confirm(`\u786e\u5b9a\u8981\u6e05\u7a7a\u7528\u6237 ${email} \u7684\u4e1a\u52a1\u6570\u636e\u5417\uff1f\n\u5c06\u5220\u9664\u4f1a\u8bdd\u3001\u6587\u6863\u3001BOM \u7b49\u5185\u5bb9\uff0c\u64cd\u4f5c\u4e0d\u53ef\u6062\u590d\uff01`)) {
+      return
+    }
+
+    try {
+      setClearingUserId(userId)
+      const response = await fetch('/api/admin/users/clear-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        alert(data?.error || '\u6e05\u7a7a\u7528\u6237\u6570\u636e\u5931\u8d25')
+        return
+      }
+
+      const summary = data?.summary || {}
+      alert(
+        `\u5df2\u6e05\u7a7a ${email} \u7684\u6570\u636e\uff1a\n` +
+          `\u4f1a\u8bdd\uff1a${summary.sessions || 0} \u6761\n` +
+          `\u6587\u6863\uff1a${summary.documents || 0} \u6761\n` +
+          `\u5411\u91cf\uff1a${summary.embeddings || 0} \u6761\n` +
+          `BOM\u9879\u76ee\uff1a${summary.bomProjects || 0} \u4e2a\n` +
+          `\u603b\u8ba1\u5220\u9664\uff1a${data?.totalDeletedRows || 0} \u6761` +
+          (data?.note ? `\n\n${data.note}` : '')
+      )
+
+      await loadOps()
+    } catch (error) {
+      console.error('clear user data failed:', error)
+      alert('\u6e05\u7a7a\u7528\u6237\u6570\u636e\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5')
+    } finally {
+      setClearingUserId(null)
     }
   }
 
@@ -456,30 +498,41 @@ export default function AdminPage() {
                       {formatDate(user.createdAt)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {user.id !== currentUser?.id && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() =>
-                              handleRoleChange(
-                                user.id,
-                                user.role === 'admin' ? 'user' : 'admin'
-                              )
-                            }
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            {user.role === 'admin' ? '降为普通用户' : '提升为管理员'}
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id, user.email)}
-                            className="text-red-600 hover:text-red-900"
-                          >
-                            删除
-                          </button>
-                        </div>
-                      )}
-                      {user.id === currentUser?.id && (
-                        <span className="text-gray-400">当前用户</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleClearUserData(user.id, user.email)}
+                          disabled={clearingUserId === user.id}
+                          className="text-amber-600 hover:text-amber-800 disabled:text-amber-300 disabled:cursor-not-allowed"
+                        >
+                          {clearingUserId === user.id ? '\u6e05\u7a7a\u4e2d...' : '\u6e05\u7a7a\u6570\u636e'}
+                        </button>
+
+                        {user.id !== currentUser?.id && (
+                          <>
+                            <button
+                              onClick={() =>
+                                handleRoleChange(
+                                  user.id,
+                                  user.role === 'admin' ? 'user' : 'admin'
+                                )
+                              }
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              {user.role === 'admin' ? '\u964d\u4e3a\u666e\u901a\u7528\u6237' : '\u63d0\u5347\u4e3a\u7ba1\u7406\u5458'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id, user.email)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              {'\u5220\u9664'}
+                            </button>
+                          </>
+                        )}
+
+                        {user.id === currentUser?.id && (
+                          <span className="text-gray-400">{'\u5f53\u524d\u7528\u6237'}</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
