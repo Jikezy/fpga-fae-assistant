@@ -18,21 +18,16 @@ export interface ParseResult {
   parseEngine: 'deepseek' | 'rule' // 解析引擎：deepseek AI 或规则降级
 }
 
-const BOM_SYSTEM_PROMPT = `你是电子元器件 BOM 解析专家。将文本解析为 JSON。
-
-每个元器件提取：
-- name: 元器件名称（如 STM32F103C8T6、10kΩ电阻）
-- spec: 规格（如封装、阻值，不重复 name）
-- quantity: 数量（默认1）
-- searchKeyword: 淘宝搜索关键词，要求简短（≤20字符）
-  * 去掉所有 LCC/LGA/QFN/SW-TH/LCC-LGA 等封装代码
-  * 去掉 L17.7/W15.8/4P/6P 等尺寸参数
-  * 芯片只保留型号：ML307C-DC-CN、STM32F103C8T6
-  * 电阻电容加通用名：10K电阻 0805、10uF电容
-  * 连接器/开关加通用名：USB接口、按键开关、排针
-- category: 芯片/电容/电阻/电感/二极管/三极管/模块/连接器/线材/工具/其他
-
-只返回JSON：{"items": [...], "warnings": []}`
+const BOM_SYSTEM_PROMPT = `You are a BOM parser for electronic components.
+Return ONLY valid JSON (no markdown, no code fences, no explanation) with this schema:
+{"items":[{"name":"","spec":"","quantity":1,"searchKeyword":"","category":""}],"warnings":[]}
+Rules:
+- Keep one item per component line.
+- quantity must be integer >= 1.
+- searchKeyword must be concise for ecommerce search, remove package-only tails and trailing quantity markers.
+- category must be one of: chip, capacitor, resistor, inductor, diode, transistor, module, connector, cable, tool, other.
+- If uncertain, keep best guess and add a short warning.
+Output JSON only.`
 
 const MODEL_SKIP_CACHE_TTL_MS = 30 * 60 * 1000
 const modelSkipCache = new Map<string, number>()
@@ -171,6 +166,9 @@ export async function parseBomText(
 
           const data = await response.json()
           const content = extractMessageText(data?.choices?.[0]?.message?.content)
+          const finishReason = typeof data?.choices?.[0]?.finish_reason === 'string'
+            ? data.choices[0].finish_reason
+            : ''
 
           if (!content) {
             lastErrorReason = `empty_content_${candidate.source}_${modelTag}`
@@ -180,27 +178,67 @@ export async function parseBomText(
 
           const payload = extractJsonPayload(content)
           if (!payload) {
-            const rescued = deriveItemsFromAiText(content)
-            if (rescued.length > 0) {
+            const rescuedJsonLike = deriveItemsFromJsonLikeText(content)
+            if (rescuedJsonLike.length > 0) {
+              const mergedItems = maybeSupplementWithRule(rescuedJsonLike, fallbackResult.items)
+              const recoveredWarnings = [`AI recovered via json-like fallback (${requestModel})`]
+              if (mergedItems.length > rescuedJsonLike.length) {
+                recoveredWarnings.push('AI supplemented with rule coverage')
+              }
               return {
-                items: rescued,
-                warnings: [`AI recovered via text fallback (${requestModel})`],
+                items: mergedItems,
+                warnings: recoveredWarnings,
                 parseEngine: 'deepseek',
               }
             }
 
-            lastErrorReason = `json_extract_failed_${candidate.source}_${modelTag}`
+            const rescued = deriveItemsFromAiText(content)
+            if (rescued.length > 0) {
+              const mergedItems = maybeSupplementWithRule(rescued, fallbackResult.items)
+              const recoveredWarnings = [`AI recovered via text fallback (${requestModel})`]
+              if (mergedItems.length > rescued.length) {
+                recoveredWarnings.push('AI supplemented with rule coverage')
+              }
+              return {
+                items: mergedItems,
+                warnings: recoveredWarnings,
+                parseEngine: 'deepseek',
+              }
+            }
+
+            lastErrorReason = finishReason === 'length'
+              ? `json_extract_failed_length_${candidate.source}_${modelTag}`
+              : `json_extract_failed_${candidate.source}_${modelTag}`
             console.error(`DeepSeek response does not contain valid JSON (${candidate.source}, model=${requestModel})`)
             continue
           }
 
           const parsed = normalizeAiResponse(payload)
           if (parsed.items.length === 0) {
+            const rescuedJsonLike = deriveItemsFromJsonLikeText(content)
+            if (rescuedJsonLike.length > 0) {
+              const mergedItems = maybeSupplementWithRule(rescuedJsonLike, fallbackResult.items)
+              const recoveredWarnings = [...parsed.warnings, `AI recovered via json-like fallback (${requestModel})`]
+              if (mergedItems.length > rescuedJsonLike.length) {
+                recoveredWarnings.push('AI supplemented with rule coverage')
+              }
+              return {
+                items: mergedItems,
+                warnings: recoveredWarnings,
+                parseEngine: 'deepseek',
+              }
+            }
+
             const rescued = deriveItemsFromAiText(content)
             if (rescued.length > 0) {
+              const mergedItems = maybeSupplementWithRule(rescued, fallbackResult.items)
+              const recoveredWarnings = [...parsed.warnings, `AI recovered via text fallback (${requestModel})`]
+              if (mergedItems.length > rescued.length) {
+                recoveredWarnings.push('AI supplemented with rule coverage')
+              }
               return {
-                items: rescued,
-                warnings: [...parsed.warnings, `AI recovered via text fallback (${requestModel})`],
+                items: mergedItems,
+                warnings: recoveredWarnings,
                 parseEngine: 'deepseek',
               }
             }
@@ -210,9 +248,15 @@ export async function parseBomText(
             continue
           }
 
+          const mergedItems = maybeSupplementWithRule(parsed.items, fallbackResult.items)
+          const mergedWarnings = [...parsed.warnings]
+          if (mergedItems.length > parsed.items.length) {
+            mergedWarnings.push('AI supplemented with rule coverage')
+          }
+
           return {
-            items: parsed.items,
-            warnings: parsed.warnings,
+            items: mergedItems,
+            warnings: mergedWarnings,
             parseEngine: 'deepseek',
           }
         } catch (error) {
@@ -606,6 +650,83 @@ function deriveItemsFromAiText(content: string): BomItem[] {
   return items
 }
 
+function deriveItemsFromJsonLikeText(content: string): BomItem[] {
+  const objectCandidates = extractJsonLikeObjects(content)
+  const items: BomItem[] = []
+
+  for (const candidate of objectCandidates) {
+    const normalizedCandidate = normalizeJsonLikeObject(candidate)
+    const parsed = tryParseJsonCandidate(normalizedCandidate)
+    if (parsed && isRecord(parsed)) {
+      const normalized = normalizeAiItem(parsed)
+      if (normalized) items.push(normalized)
+    }
+  }
+
+  return dedupeBomItems(items)
+}
+
+function extractJsonLikeObjects(content: string): string[] {
+  const normalized = content
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+
+  const matches = normalized.match(/\{[^{}]*\}/g) || []
+  return matches.filter(segment => /(?:name|spec|quantity|searchKeyword|category)/i.test(segment))
+}
+
+function normalizeJsonLikeObject(candidate: string): string {
+  return candidate
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)/g, '$1"$2"$3')
+    .replace(/'([A-Za-z_][A-Za-z0-9_]*)'\s*:/g, '"$1":')
+    .replace(/:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, ': "$1"')
+    .replace(/,\s*([}\]])/g, '$1')
+}
+
+function maybeSupplementWithRule(aiItems: BomItem[], ruleItems: BomItem[]): BomItem[] {
+  const normalizedAi = dedupeBomItems(aiItems)
+  if (!ruleItems.length || normalizedAi.length >= ruleItems.length * 0.9) {
+    return normalizedAi
+  }
+
+  const merged = new Map<string, BomItem>()
+  for (const item of normalizedAi) {
+    merged.set(buildBomItemKey(item), item)
+  }
+
+  for (const item of ruleItems) {
+    const key = buildBomItemKey(item)
+    if (!merged.has(key)) {
+      merged.set(key, item)
+    }
+  }
+
+  return Array.from(merged.values())
+}
+
+function dedupeBomItems(items: BomItem[]): BomItem[] {
+  const unique = new Map<string, BomItem>()
+
+  for (const item of items) {
+    const key = buildBomItemKey(item)
+    if (!unique.has(key)) {
+      unique.set(key, item)
+    }
+  }
+
+  return Array.from(unique.values())
+}
+
+function buildBomItemKey(item: BomItem): string {
+  return `${normalizeBomKeyToken(item.name)}::${normalizeBomKeyToken(item.spec)}`
+}
+
+function normalizeBomKeyToken(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 function isJsonArtifactLine(line: string): boolean {
   const trimmed = line.trim()
   if (!trimmed) return true
@@ -735,8 +856,8 @@ function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: numbe
     .filter(Boolean).length
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 40))
 
-  const maxTokens = Math.max(768, Math.min(2048, 512 + estimatedItems * 24))
-  const timeoutMs = Math.max(30000, Math.min(90000, 25000 + estimatedItems * 700))
+  const maxTokens = Math.max(1024, Math.min(4096, 768 + estimatedItems * 32))
+  const timeoutMs = Math.max(22000, Math.min(65000, 18000 + estimatedItems * 520))
 
   return { maxTokens, timeoutMs }
 }
