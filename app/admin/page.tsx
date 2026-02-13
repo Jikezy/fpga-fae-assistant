@@ -196,7 +196,6 @@ export default function AdminPage() {
       const summary = data?.summary || {}
       alert(
         `\u5df2\u6e05\u7a7a ${email} \u7684\u6570\u636e\uff1a\n` +
-          `\u4f1a\u8bdd\uff1a${summary.sessions || 0} \u6761\n` +
           `\u6587\u6863\uff1a${summary.documents || 0} \u6761\n` +
           `\u5411\u91cf\uff1a${summary.embeddings || 0} \u6761\n` +
           `BOM\u9879\u76ee\uff1a${summary.bomProjects || 0} \u4e2a\n` +
@@ -499,13 +498,17 @@ export default function AdminPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleClearUserData(user.id, user.email)}
-                          disabled={clearingUserId === user.id}
-                          className="text-amber-600 hover:text-amber-800 disabled:text-amber-300 disabled:cursor-not-allowed"
-                        >
-                          {clearingUserId === user.id ? '\u6e05\u7a7a\u4e2d...' : '\u6e05\u7a7a\u6570\u636e'}
-                        </button>
+                        {user.id !== currentUser?.id ? (
+                          <button
+                            onClick={() => handleClearUserData(user.id, user.email)}
+                            disabled={clearingUserId === user.id}
+                            className="text-amber-600 hover:text-amber-800 disabled:text-amber-300 disabled:cursor-not-allowed"
+                          >
+                            {clearingUserId === user.id ? '\u6e05\u7a7a\u4e2d...' : '\u6e05\u7a7a\u6570\u636e'}
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">{'\u5f53\u524d\u8d26\u53f7\u4e0d\u53ef\u6e05\u7a7a'}</span>
+                        )}
 
                         {user.id !== currentUser?.id && (
                           <>

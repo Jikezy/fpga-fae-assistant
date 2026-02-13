@@ -9,7 +9,7 @@ type DeletedTableStat = {
   deletedRows: number
 }
 
-const TABLE_PRIORITY = ['sessions', 'embeddings', 'documents', 'bom_projects']
+const TABLE_PRIORITY = ['embeddings', 'documents', 'bom_projects']
 
 function toNumber(value: unknown): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -51,6 +51,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '\u7f3a\u5c11\u7528\u6237ID' }, { status: 400 })
     }
 
+    if (userId === authResult.user.id) {
+      return NextResponse.json(
+        { error: '\u4e0d\u80fd\u6e05\u7a7a\u5f53\u524d\u767b\u5f55\u7684\u7ba1\u7406\u5458\u8d26\u53f7\uff0c\u8bf7\u4f7f\u7528\u5176\u4ed6\u7ba1\u7406\u5458\u8d26\u53f7\u64cd\u4f5c' },
+        { status: 400 }
+      )
+    }
+
     const sql = getSql()
 
     const userRows = await sql`
@@ -73,7 +80,7 @@ export async function POST(req: NextRequest) {
     const tables = sortUserTables(
       tableRows
         .map((row) => (typeof row.table_name === 'string' ? row.table_name : ''))
-        .filter((tableName) => tableName && tableName !== 'users' && isSafeIdentifier(tableName))
+        .filter((tableName) => tableName && tableName !== 'users' && tableName !== 'sessions' && isSafeIdentifier(tableName))
     )
 
     const deletedTables: DeletedTableStat[] = []
@@ -109,14 +116,13 @@ export async function POST(req: NextRequest) {
         email: userRows[0].email,
       },
       summary: {
-        sessions: getCount('sessions'),
         documents: getCount('documents'),
         embeddings: getCount('embeddings'),
         bomProjects: getCount('bom_projects'),
       },
       deletedTables,
       totalDeletedRows,
-      note: '\u804a\u5929\u6d88\u606f\u9ed8\u8ba4\u4e0d\u5728\u670d\u52a1\u7aef\u6301\u4e45\u5316\uff0c\u5df2\u6e05\u7a7a\u8be5\u7528\u6237\u53ef\u8bc6\u522b\u7684\u4e1a\u52a1\u6570\u636e\u3002',
+      note: '\u804a\u5929\u6d88\u606f\u9ed8\u8ba4\u4e0d\u5728\u670d\u52a1\u7aef\u6301\u4e45\u5316\uff0c\u4e14\u672c\u64cd\u4f5c\u4e0d\u4f1a\u6e05\u7406\u767b\u5f55\u4f1a\u8bdd\u3002\u5df2\u6e05\u7a7a\u8be5\u7528\u6237\u53ef\u8bc6\u522b\u7684\u4e1a\u52a1\u6570\u636e\u3002',
     })
   } catch (error) {
     console.error('clear user data failed:', error)
