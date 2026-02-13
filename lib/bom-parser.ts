@@ -57,7 +57,11 @@ export async function parseBomText(
   const backupBaseUrl = normalizeBaseUrl(userConfig?.backupBaseUrl)
   const defaultBaseUrl = 'https://api.deepseek.com'
   const modelCandidates = buildModelCandidates(userConfig?.model, process.env.DEEPSEEK_MODEL)
-  const { maxTokens, timeoutMs } = getDynamicAiBudget(text, { chunkMode: userConfig?.chunkMode === true })
+  const isChunkMode = userConfig?.chunkMode === true
+  const activeModelCandidates = isChunkMode
+    ? modelCandidates.slice(0, Math.min(2, modelCandidates.length))
+    : modelCandidates
+  const { maxTokens, timeoutMs } = getDynamicAiBudget(text, { chunkMode: isChunkMode })
   const fallbackResult = ruleBasedParse(text)
 
   if (!userConfig?.chunkMode) {
@@ -99,14 +103,21 @@ export async function parseBomText(
 
   let lastErrorReason = ''
 
-  for (const candidate of candidates) {
+  const activeCandidates = isChunkMode
+    ? candidates.slice(0, Math.min(1, candidates.length))
+    : candidates
+
+  for (const candidate of activeCandidates) {
     const endpoints = buildCompletionEndpointCandidates(candidate.baseUrl)
+    const activeEndpoints = isChunkMode
+      ? endpoints.slice(0, Math.min(1, endpoints.length))
+      : endpoints
     let candidateBlocked = false
 
-    for (const endpoint of endpoints) {
+    for (const endpoint of activeEndpoints) {
       const attemptedModels = new Set<string>()
 
-      for (const model of modelCandidates) {
+      for (const model of activeModelCandidates) {
         const requestModel = normalizeModelForEndpoint(model, endpoint)
         const requestModelKey = requestModel.toLowerCase()
         if (attemptedModels.has(requestModelKey)) {
@@ -122,7 +133,8 @@ export async function parseBomText(
         }
 
         try {
-          let requestBody = buildCompletionRequest(requestModel, text, maxTokens, true)
+          const useStrictJson = !isChunkMode
+          let requestBody = buildCompletionRequest(requestModel, text, maxTokens, useStrictJson)
           let response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -136,7 +148,7 @@ export async function parseBomText(
           if (!response.ok) {
             let errText = await response.text()
 
-            if (isUnsupportedResponseFormatError(response.status, errText)) {
+            if (useStrictJson && isUnsupportedResponseFormatError(response.status, errText)) {
               requestBody = buildCompletionRequest(requestModel, text, maxTokens, false)
               response = await fetch(endpoint, {
                 method: 'POST',
@@ -823,8 +835,8 @@ async function parseBomByChunks(
           ? 40
           : 28
   const averageLineLength = Math.max(1, Math.ceil(text.length / Math.max(lines.length, 1)))
-  const sizeByTextDensity = Math.max(10, Math.floor(6000 / averageLineLength))
-  const chunkSize = Math.max(10, Math.min(baseChunkSize, sizeByTextDensity))
+  const sizeByTextDensity = Math.max(8, Math.floor(5000 / averageLineLength))
+  const chunkSize = Math.max(8, Math.min(baseChunkSize, sizeByTextDensity))
   const chunks: string[] = []
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'))
@@ -1028,8 +1040,9 @@ function getDynamicAiBudget(
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 90))
 
   if (options?.chunkMode) {
-    const maxTokens = Math.max(768, Math.min(2048, 512 + estimatedItems * 12))
-    const timeoutMs = Math.max(10000, Math.min(18000, 9000 + estimatedItems * 120))
+    const estimatedChunkItems = Math.max(meaningfulLines, Math.ceil(text.length / 200))
+    const maxTokens = Math.max(640, Math.min(1536, 448 + estimatedChunkItems * 10))
+    const timeoutMs = Math.max(8000, Math.min(14000, 7000 + estimatedChunkItems * 90))
     return { maxTokens, timeoutMs }
   }
 
