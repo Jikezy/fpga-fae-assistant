@@ -57,7 +57,7 @@ export async function parseBomText(
   const backupBaseUrl = normalizeBaseUrl(userConfig?.backupBaseUrl)
   const defaultBaseUrl = 'https://api.deepseek.com'
   const modelCandidates = buildModelCandidates(userConfig?.model, process.env.DEEPSEEK_MODEL)
-  const { maxTokens, timeoutMs } = getDynamicAiBudget(text)
+  const { maxTokens, timeoutMs } = getDynamicAiBudget(text, { chunkMode: userConfig?.chunkMode === true })
   const fallbackResult = ruleBasedParse(text)
 
   if (!userConfig?.chunkMode) {
@@ -793,11 +793,18 @@ function compactAiWarnings(warnings: string[]): string[] {
 
 async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Promise<ParseResult | null> {
   const lines = splitBomTextLines(text)
-  if (lines.length < 36) {
+  const shouldChunk = lines.length >= 72 || text.length >= 12000
+  if (!shouldChunk) {
     return null
   }
 
-  const chunkSize = lines.length >= 120 ? 20 : 16
+  const chunkSize = lines.length >= 280
+    ? 36
+    : lines.length >= 180
+      ? 30
+      : lines.length >= 120
+        ? 26
+        : 22
   const chunks: string[] = []
   for (let i = 0; i < lines.length; i += chunkSize) {
     chunks.push(lines.slice(i, i + chunkSize).join('\n'))
@@ -812,7 +819,7 @@ async function parseBomByChunks(text: string, userConfig?: BomParseConfig): Prom
   let deepseekChunkCount = 0
   let ruleChunkCount = 0
 
-  const batchSize = chunks.length >= 6 ? 3 : 2
+  const batchSize = chunks.length >= 9 ? 5 : chunks.length >= 6 ? 4 : 3
 
   for (let i = 0; i < chunks.length; i += batchSize) {
     const batch = chunks.slice(i, i + batchSize)
@@ -990,15 +997,24 @@ function ruleBasedParse(text: string): ParseResult {
 /**
  * Scale AI response budget by BOM size to reduce JSON truncation fallback.
  */
-function getDynamicAiBudget(text: string): { maxTokens: number; timeoutMs: number } {
+function getDynamicAiBudget(
+  text: string,
+  options?: { chunkMode?: boolean }
+): { maxTokens: number; timeoutMs: number } {
   const meaningfulLines = text
     .split(/[\n;]/)
     .map(line => line.trim())
     .filter(Boolean).length
   const estimatedItems = Math.max(meaningfulLines, Math.ceil(text.length / 40))
 
+  if (options?.chunkMode) {
+    const maxTokens = Math.max(768, Math.min(2304, 640 + estimatedItems * 20))
+    const timeoutMs = Math.max(12000, Math.min(24000, 9000 + estimatedItems * 220))
+    return { maxTokens, timeoutMs }
+  }
+
   const maxTokens = Math.max(1024, Math.min(4096, 768 + estimatedItems * 32))
-  const timeoutMs = Math.max(28000, Math.min(70000, 22000 + estimatedItems * 560))
+  const timeoutMs = Math.max(18000, Math.min(45000, 15000 + estimatedItems * 420))
 
   return { maxTokens, timeoutMs }
 }
