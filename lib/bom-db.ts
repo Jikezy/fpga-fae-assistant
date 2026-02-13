@@ -106,27 +106,90 @@ export async function addItems(projectId: string, items: Array<{
   quantity: number
 }>): Promise<BomItemRecord[]> {
   const sql = getSql()
-  const results: BomItemRecord[] = []
 
-  for (const item of items) {
-    const id = randomBytes(16).toString('hex')
-    const now = new Date().toISOString()
-
-    await sql`
-      INSERT INTO bom_items (id, project_id, raw_input, parsed_name, parsed_spec, search_keyword, quantity, status, created_at)
-      VALUES (${id}, ${projectId}, ${item.rawInput}, ${item.parsedName}, ${item.parsedSpec}, ${item.searchKeyword}, ${item.quantity}, 'pending', ${now})
-    `
-
-    results.push({
-      id, project_id: projectId, raw_input: item.rawInput,
-      parsed_name: item.parsedName, parsed_spec: item.parsedSpec,
-      search_keyword: item.searchKeyword, quantity: item.quantity,
-      status: 'pending', best_price: null, best_source: null,
-      buy_url: null, tao_token: null, search_results: null, created_at: now,
-    })
+  if (items.length === 0) {
+    return []
   }
 
-  return results
+  const pendingStatus = 'pending'
+  const normalizedItems = items.map((item) => ({
+    id: randomBytes(16).toString('hex'),
+    rawInput: item.rawInput,
+    parsedName: item.parsedName,
+    parsedSpec: item.parsedSpec,
+    searchKeyword: item.searchKeyword,
+    quantity: Math.max(1, Math.floor(item.quantity || 1)),
+    createdAt: new Date().toISOString(),
+  }))
+
+  const valueSql: string[] = []
+  const params: Array<string | number | null> = []
+
+  normalizedItems.forEach((item, index) => {
+    const offset = index * 9
+    valueSql.push(
+      `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9})`
+    )
+
+    params.push(
+      item.id,
+      projectId,
+      item.rawInput,
+      item.parsedName || null,
+      item.parsedSpec || null,
+      item.searchKeyword || null,
+      item.quantity,
+      pendingStatus,
+      item.createdAt
+    )
+  })
+
+  const insertedRows = await sql(
+    `INSERT INTO bom_items (
+      id,
+      project_id,
+      raw_input,
+      parsed_name,
+      parsed_spec,
+      search_keyword,
+      quantity,
+      status,
+      created_at
+    ) VALUES ${valueSql.join(', ')}
+    RETURNING *`,
+    params
+  )
+
+  const rowById = new Map<string, any>()
+  for (const row of insertedRows as any[]) {
+    if (typeof row?.id === 'string') {
+      rowById.set(row.id, row)
+    }
+  }
+
+  return normalizedItems.map((item) => {
+    const row = rowById.get(item.id)
+    if (row) {
+      return row as BomItemRecord
+    }
+
+    return {
+      id: item.id,
+      project_id: projectId,
+      raw_input: item.rawInput,
+      parsed_name: item.parsedName,
+      parsed_spec: item.parsedSpec,
+      search_keyword: item.searchKeyword,
+      quantity: item.quantity,
+      status: pendingStatus,
+      best_price: null,
+      best_source: null,
+      buy_url: null,
+      tao_token: null,
+      search_results: null,
+      created_at: item.createdAt,
+    }
+  })
 }
 
 export async function getItems(projectId: string): Promise<BomItemRecord[]> {
