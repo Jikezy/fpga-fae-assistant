@@ -42,17 +42,17 @@ interface OpsMetrics {
 }
 
 const OPS_TABLE_NAME_MAP: Record<string, string> = {
-  documents: '??',
-  sessions: '??',
-  bom_items: 'BOM ???',
-  price_cache: '????',
-  bom_projects: 'BOM ??',
-  proxy_api_keys: '?? API ??',
-  users: '??',
-  ai_providers: 'AI ???',
-  embeddings: '????',
-  proxy_logs: '????',
-  pdf_files: 'PDF ??',
+  documents: '\u6587\u6863',
+  sessions: '\u4f1a\u8bdd',
+  bom_items: 'BOM \u5143\u5668\u4ef6',
+  price_cache: '\u4ef7\u683c\u7f13\u5b58',
+  bom_projects: 'BOM \u9879\u76ee',
+  proxy_api_keys: '\u4ee3\u7406 API \u5bc6\u94a5',
+  users: '\u7528\u6237',
+  ai_providers: 'AI \u63d0\u4f9b\u5546',
+  embeddings: '\u5411\u91cf\u6570\u636e',
+  proxy_logs: '\u4ee3\u7406\u65e5\u5fd7',
+  pdf_files: 'PDF \u6587\u4ef6',
 }
 
 export default function AdminPage() {
@@ -117,7 +117,7 @@ export default function AdminPage() {
       setOpsMetrics(data)
     } catch (error) {
       console.error('load ops failed:', error)
-      setOpsError('??????????????')
+      setOpsError('\u8fd0\u8425\u770b\u677f\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5')
     } finally {
       setOpsLoading(false)
     }
@@ -306,13 +306,13 @@ export default function AdminPage() {
         {/* 数据库工具 */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <div className="flex items-center justify-between gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">??????????</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{'\u8fd0\u8425\u770b\u677f\uff08\u4ec5\u7ba1\u7406\u5458\uff09'}</h2>
             <button
               onClick={loadOps}
               disabled={opsLoading}
               className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
             >
-              {opsLoading ? '???...' : '??'}
+              {opsLoading ? '\u5237\u65b0\u4e2d...' : '\u5237\u65b0'}
             </button>
           </div>
 
@@ -326,22 +326,22 @@ export default function AdminPage() {
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">BOM ???24???</p>
+                  <p className="text-xs text-gray-500">{'BOM \u9879\u76ee\uff0824\u5c0f\u65f6\uff09'}</p>
                   <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.bomProjects24h)}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">BOM ????24???</p>
+                  <p className="text-xs text-gray-500">{'BOM \u5143\u5668\u4ef6\uff0824\u5c0f\u65f6\uff09'}</p>
                   <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.bomItems24h)}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">??????</p>
+                  <p className="text-xs text-gray-500">{'\u6709\u6548\u4ef7\u683c\u7f13\u5b58'}</p>
                   <p className="text-2xl font-semibold text-gray-900">{formatCount(opsMetrics.summary.activePriceCache)}</p>
                 </div>
                 <div className="rounded-lg border border-gray-200 p-4">
-                  <p className="text-xs text-gray-500">?????</p>
+                  <p className="text-xs text-gray-500">{'\u6570\u636e\u5e93\u5927\u5c0f'}</p>
                   <p className="text-2xl font-semibold text-gray-900">{opsMetrics.database.pretty}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    ?? 0.5GB ??????{opsMetrics.pressure.usagePercentOfHalfGb}%
+                    {'\u514d\u8d39 0.5GB \u914d\u989d\u4f7f\u7528\u7387\uff1a'}{opsMetrics.pressure.usagePercentOfHalfGb}%
                   </p>
                 </div>
               </div>
@@ -350,9 +350,9 @@ export default function AdminPage() {
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 text-gray-500">
-                      <th className="text-left py-2 pr-4">???</th>
-                      <th className="text-left py-2 pr-4">??????</th>
-                      <th className="text-left py-2">??</th>
+                      <th className="text-left py-2 pr-4">{'\u6570\u636e\u8868'}</th>
+                      <th className="text-left py-2 pr-4">{'\u884c\u6570\uff08\u4f30\u7b97\uff09'}</th>
+                      <th className="text-left py-2">{'\u5b58\u50a8'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -368,7 +368,7 @@ export default function AdminPage() {
               </div>
 
               <p className="text-xs text-gray-500 mt-3">
-                ?????{new Date(opsMetrics.generatedAt).toLocaleString('zh-CN')}
+                {'\u66f4\u65b0\u65f6\u95f4\uff1a'}{new Date(opsMetrics.generatedAt).toLocaleString('zh-CN')}
               </p>
             </>
           )}
