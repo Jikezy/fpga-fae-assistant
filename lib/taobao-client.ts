@@ -36,18 +36,102 @@ class TaobaoClient {
   private appKey: string
   private appSecret: string
   private pid: string
+  private adzoneId: string
   private isMock: boolean
   public lastError: string = ''
 
   constructor() {
     this.appKey = process.env.TAOBAO_APP_KEY || ''
     this.appSecret = process.env.TAOBAO_APP_SECRET || ''
-    this.pid = process.env.TAOBAO_PID || ''
-    this.isMock = !this.appKey || !this.appSecret
+    this.pid = (process.env.TAOBAO_PID || '').trim()
+    this.adzoneId = this.extractAdzoneId(this.pid)
+    this.isMock = !this.appKey || !this.appSecret || !this.adzoneId
+
+    if (!this.adzoneId) {
+      this.lastError = 'TAOBAO_PID invalid: unable to extract adzone_id'
+    }
+  }
+
+  private extractAdzoneId(pid: string): string {
+    if (!pid) return ''
+
+    if (/^\d+$/.test(pid)) {
+      return pid
+    }
+
+    const normalized = pid.replace(/^mm_/, '')
+    const parts = normalized.split('_').filter(Boolean)
+    return parts.length > 0 ? parts[parts.length - 1] : ''
+  }
+
+  private formatTimestampGmt8(date = new Date()): string {
+    const gmt8 = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+    const yyyy = gmt8.getUTCFullYear()
+    const mm = String(gmt8.getUTCMonth() + 1).padStart(2, '0')
+    const dd = String(gmt8.getUTCDate()).padStart(2, '0')
+    const hh = String(gmt8.getUTCHours()).padStart(2, '0')
+    const mi = String(gmt8.getUTCMinutes()).padStart(2, '0')
+    const ss = String(gmt8.getUTCSeconds()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`
+  }
+
+  private normalizeUrl(url: string | undefined): string {
+    if (!url) return ''
+    if (url.startsWith('//')) return `https:${url}`
+    if (url.startsWith('http://')) return `https://${url.slice('http://'.length)}`
+    return url
+  }
+
+  private formatCommissionRate(raw: unknown): string {
+    if (raw === null || raw === undefined) return ''
+    const text = String(raw).trim()
+    if (!text) return ''
+    return text.endsWith('%') ? text : `${text}%`
+  }
+
+  private mapProduct(item: any): TaobaoProduct {
+    const basic = item?.item_basic_info || item || {}
+    const priceInfo = item?.price_promotion_info || item || {}
+    const publishInfo = item?.publish_info || {}
+    const incomeInfo = publishInfo?.income_info || {}
+
+    const clickUrl = this.normalizeUrl(publishInfo?.click_url || item?.click_url)
+    const couponShareUrl = this.normalizeUrl(publishInfo?.coupon_share_url || item?.coupon_share_url)
+    const fallbackUrl = this.normalizeUrl(item?.url)
+
+    const reservePrice = String(priceInfo?.reserve_price || item?.reserve_price || '')
+    const salePrice = String(priceInfo?.zk_final_price || priceInfo?.final_promotion_price || item?.zk_final_price || reservePrice)
+    const couponAmount = String(item?.coupon_amount || '')
+
+    return {
+      itemId: String(item?.item_id || ''),
+      title: String(basic?.title || item?.title || ''),
+      price: salePrice,
+      originalPrice: reservePrice,
+      sales: basic?.volume || item?.volume ? `${basic?.volume || item?.volume}\u4eba\u4ed8\u6b3e` : '',
+      shopName: String(basic?.shop_title || item?.shop_title || item?.nick || ''),
+      shopScore: item?.shop_dsr ? `${item.shop_dsr}/5.0` : '',
+      imageUrl: this.normalizeUrl(String(basic?.pict_url || item?.pict_url || '')),
+      buyUrl: couponShareUrl || clickUrl || fallbackUrl,
+      taoToken: '',
+      couponInfo: String(item?.coupon_info || ''),
+      couponAmount: couponAmount ? `${couponAmount}\u5143` : '',
+      commissionRate: this.formatCommissionRate(incomeInfo?.commission_rate || publishInfo?.income_rate || item?.commission_rate),
+      platform: Number(basic?.user_type ?? item?.user_type) === 1 ? 'tmall' : 'taobao',
+    }
+  }
+
+  private buildAffiliateSearchUrl(keyword: string): string {
+    const encodedKeyword = encodeURIComponent(keyword)
+    if (!this.pid || !this.adzoneId) {
+      return `https://s.taobao.com/search?q=${encodedKeyword}&sort=sale-desc`
+    }
+
+    return `https://uland.taobao.com/sem/tbsearch?refpid=${this.pid}&keyword=${encodedKeyword}&clk1=&upsId=${this.adzoneId}`
   }
 
   /**
-   * 生成 API 签名
+   * Generate API signature
    */
   private sign(params: Record<string, string>): string {
     const sorted = Object.keys(params).sort()
@@ -66,8 +150,9 @@ class TaobaoClient {
     const baseParams: Record<string, string> = {
       method,
       app_key: this.appKey,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      timestamp: this.formatTimestampGmt8(),
       format: 'json',
+      simplify: 'true',
       v: '2.0',
       sign_method: 'md5',
       ...params,
@@ -79,173 +164,124 @@ class TaobaoClient {
 
     const response = await fetch(url, { method: 'GET' })
     if (!response.ok) {
-      throw new Error(`淘宝 API 请求失败: ${response.status}`)
+      throw new Error(`Taobao API request failed: ${response.status}`)
     }
     return response.json()
   }
 
-  /**
-   * 搜索商品
-   * 优先使用下游者 API (27939)，失败时尝试推广者 API (16516)，都失败则降级
-   */
   async searchProducts(params: SearchParams): Promise<TaobaoProduct[]> {
     if (this.isMock) {
-      console.log('[TaobaoClient] Mock 模式，返回推广链接')
+      console.log('[TaobaoClient] mock mode, using affiliate search links')
       return this.mockSearch(params.keyword)
     }
 
-    // 方案1：尝试下游者物料搜索 API (权限 27939)
-    const result1 = await this.tryScMaterialSearch(params)
-    if (result1.success) {
-      console.log('[TaobaoClient] 下游者 API 成功')
-      return result1.products
+    const result = await this.tryDgMaterialSearch(params)
+    if (result.success) {
+      console.log('[TaobaoClient] DG API success')
+      this.lastError = ''
+      return result.products
     }
 
-    // 方案2：尝试推广者物料搜索 API (权限 16516)
-    const result2 = await this.tryDgMaterialSearch(params)
-    if (result2.success) {
-      console.log('[TaobaoClient] 推广者 API 成功')
-      return result2.products
-    }
-
-    // 方案3：降级为推广搜索链接
-    console.log('[TaobaoClient] 所有 API 失败，使用推广链接降级方案')
-    this.lastError = `${result1.error} | ${result2.error}`
+    console.log('[TaobaoClient] API search failed, fallback to affiliate search link')
+    this.lastError = result.error
     return this.fallbackSearch(params.keyword)
   }
 
-  /**
-   * 尝试下游者物料搜索 (权限 27939)
-   */
-  private async tryScMaterialSearch(params: SearchParams): Promise<{ success: boolean; products: TaobaoProduct[]; error: string }> {
+  private async tryDgMaterialSearch(params: SearchParams): Promise<{ success: boolean; products: TaobaoProduct[]; error: string }> {
+    const apiParams: Record<string, string> = {
+      q: params.keyword,
+      adzone_id: this.adzoneId,
+      page_size: (params.pageSize || 20).toString(),
+      page_no: (params.pageNo || 1).toString(),
+    }
+
+    if (params.sort) {
+      apiParams.sort = params.sort
+    }
+
+    if (params.hasCoupon) {
+      apiParams.has_coupon = 'true'
+    }
+
     try {
-      const apiParams: Record<string, string> = {
-        q: params.keyword,
-        adzone_id: this.pid.replace('mm_', '').split('_')[2],
-        page_size: (params.pageSize || 20).toString(),
-        page_no: (params.pageNo || 1).toString(),
-      }
+      console.log('[TaobaoClient] trying DG API: taobao.tbk.dg.material.optional.upgrade')
 
-      if (params.sort) {
-        apiParams.sort = params.sort
-      }
-
-      console.log('[TaobaoClient] 尝试下游者 API: taobao.tbk.sc.material.optional')
-
-      const result = await this.callApi('taobao.tbk.sc.material.optional', apiParams)
-
+      const result = await this.callApi('taobao.tbk.dg.material.optional.upgrade', apiParams)
       if (result.error_response) {
-        const error = `下游者API错误: ${result.error_response.sub_msg || result.error_response.msg} (${result.error_response.code})`
+        const error = `DG API error: ${result.error_response.sub_msg || result.error_response.msg} (${result.error_response.code})`
         console.warn('[TaobaoClient]', error)
-        return { success: false, products: [], error }
+
+        const legacy = await this.tryLegacyDgMaterialSearch(apiParams)
+        if (legacy.success) {
+          return legacy
+        }
+
+        return { success: false, products: [], error: `${error} | ${legacy.error}` }
       }
 
-      const data = result?.tbk_sc_material_optional_response?.result_list?.map_data
-
-      if (!data || data.length === 0) {
-        return { success: false, products: [], error: '下游者API未找到商品' }
+      const data = result?.tbk_dg_material_optional_upgrade_response?.result_list?.map_data || result?.result_list
+      if (!Array.isArray(data) || data.length === 0) {
+        return { success: false, products: [], error: 'DG API returned no products' }
       }
 
-      const products = data.map((item: any) => ({
-        itemId: item.item_id,
-        title: item.title,
-        price: item.zk_final_price || item.reserve_price || '',
-        originalPrice: item.reserve_price || '',
-        sales: item.volume ? `${item.volume}人付款` : '',
-        shopName: item.shop_title || item.nick || '',
-        shopScore: item.shop_dsr ? `${item.shop_dsr}/5.0` : '',
-        imageUrl: item.pict_url?.replace('http://', 'https://') || '',
-        buyUrl: item.coupon_share_url || item.url || '',
-        taoToken: '',
-        couponInfo: item.coupon_info || '',
-        couponAmount: item.coupon_amount ? `${item.coupon_amount}元` : '',
-        commissionRate: item.commission_rate ? `${item.commission_rate}%` : '',
-        platform: item.user_type === 1 ? 'tmall' : 'taobao',
-      }))
+      const products = data.map((item: any) => this.mapProduct(item)).filter((item: TaobaoProduct) => !!item.buyUrl)
+      if (products.length === 0) {
+        return { success: false, products: [], error: 'DG API returned products without links' }
+      }
 
       return { success: true, products, error: '' }
     } catch (error: any) {
-      const msg = `下游者API异常: ${error.message}`
+      const msg = `DG API exception: ${error.message}`
       console.warn('[TaobaoClient]', msg)
-      return { success: false, products: [], error: msg }
+
+      const legacy = await this.tryLegacyDgMaterialSearch(apiParams)
+      if (legacy.success) {
+        return legacy
+      }
+
+      return { success: false, products: [], error: `${msg} | ${legacy.error}` }
     }
   }
 
-  /**
-   * 尝试推广者物料搜索 (权限 16516)
-   */
-  private async tryDgMaterialSearch(params: SearchParams): Promise<{ success: boolean; products: TaobaoProduct[]; error: string }> {
+  private async tryLegacyDgMaterialSearch(apiParams: Record<string, string>): Promise<{ success: boolean; products: TaobaoProduct[]; error: string }> {
     try {
-      const apiParams: Record<string, string> = {
-        q: params.keyword,
-        adzone_id: this.pid.replace('mm_', '').split('_')[2],
-        page_size: (params.pageSize || 20).toString(),
-        page_no: (params.pageNo || 1).toString(),
-      }
-
-      if (params.sort) {
-        apiParams.sort = params.sort
-      }
-
-      if (params.hasCoupon) {
-        apiParams.has_coupon = 'true'
-      }
-
-      console.log('[TaobaoClient] 尝试推广者 API: taobao.tbk.dg.material.optional')
-
+      console.log('[TaobaoClient] fallback to legacy API: taobao.tbk.dg.material.optional')
       const result = await this.callApi('taobao.tbk.dg.material.optional', apiParams)
 
       if (result.error_response) {
-        const error = `推广者API错误: ${result.error_response.sub_msg || result.error_response.msg} (${result.error_response.code})`
+        const error = `Legacy API error: ${result.error_response.sub_msg || result.error_response.msg} (${result.error_response.code})`
         console.warn('[TaobaoClient]', error)
         return { success: false, products: [], error }
       }
 
-      const data = result?.tbk_dg_material_optional_response?.result_list?.map_data
-
-      if (!data || data.length === 0) {
-        return { success: false, products: [], error: '推广者API未找到商品' }
+      const data = result?.tbk_dg_material_optional_response?.result_list?.map_data || result?.result_list
+      if (!Array.isArray(data) || data.length === 0) {
+        return { success: false, products: [], error: 'Legacy API returned no products' }
       }
 
-      const products = data.map((item: any) => ({
-        itemId: item.item_id,
-        title: item.title,
-        price: item.zk_final_price || item.reserve_price || '',
-        originalPrice: item.reserve_price || '',
-        sales: item.volume ? `${item.volume}人付款` : '',
-        shopName: item.shop_title || item.nick || '',
-        shopScore: item.shop_dsr ? `${item.shop_dsr}/5.0` : '',
-        imageUrl: item.pict_url?.replace('http://', 'https://') || '',
-        buyUrl: item.coupon_share_url || item.url || '',
-        taoToken: '',
-        couponInfo: item.coupon_info || '',
-        couponAmount: item.coupon_amount ? `${item.coupon_amount}元` : '',
-        commissionRate: item.commission_rate ? `${item.commission_rate}%` : '',
-        platform: item.user_type === 1 ? 'tmall' : 'taobao',
-      }))
+      const products = data.map((item: any) => this.mapProduct(item)).filter((item: TaobaoProduct) => !!item.buyUrl)
+      if (products.length === 0) {
+        return { success: false, products: [], error: 'Legacy API returned products without links' }
+      }
 
       return { success: true, products, error: '' }
     } catch (error: any) {
-      const msg = `推广者API异常: ${error.message}`
+      const msg = `Legacy API exception: ${error.message}`
       console.warn('[TaobaoClient]', msg)
       return { success: false, products: [], error: msg }
     }
   }
 
-  /**
-   * API 失败时的降级方案：生成联盟推广搜索链接
-   */
   private fallbackSearch(keyword: string): TaobaoProduct[] {
-    const pidParts = this.pid.replace('mm_', '').split('_')
-    const unionUrl = `https://uland.taobao.com/sem/tbsearch?refpid=${this.pid}&keyword=${encodeURIComponent(keyword)}&clk1=&upsId=${pidParts[2]}`
+    const unionUrl = this.buildAffiliateSearchUrl(keyword)
 
     return [{
       itemId: `fallback_${Date.now()}`,
-      title: `在淘宝搜索: ${keyword}`,
+      title: `Search on Taobao: ${keyword}`,
       price: '',
       originalPrice: '',
       sales: '',
-      shopName: '淘宝联盟推广',
+      shopName: 'Taobao Affiliate',
       shopScore: '',
       imageUrl: '',
       buyUrl: unionUrl,
@@ -257,10 +293,6 @@ class TaobaoClient {
     }]
   }
 
-  /**
-   * 生成淘口令
-   * 使用淘宝联盟 API: taobao.tbk.tpwd.create
-   */
   async createTaoToken(url: string, title: string): Promise<string> {
     if (this.isMock) {
       return ''
@@ -318,7 +350,7 @@ class TaobaoClient {
 
   /**
    * 获取商品详情（需要权限 27939）
-   * 使用淘宝联盟 API: taobao.tbk.sc.material.optional
+   * Use Taobao API: taobao.tbk.dg.material.optional.upgrade
    */
   async getProductDetail(itemId: string): Promise<TaobaoProduct | null> {
     if (this.isMock) {
@@ -326,40 +358,32 @@ class TaobaoClient {
     }
 
     try {
-      const result = await this.callApi('taobao.tbk.sc.material.optional', {
+      const result = await this.callApi('taobao.tbk.dg.material.optional.upgrade', {
         item_id: itemId,
-        adzone_id: this.pid.replace('mm_', '').split('_')[2],
+        adzone_id: this.adzoneId,
+        page_size: '1',
+        page_no: '1',
       })
 
-      const data = result?.tbk_sc_material_optional_response?.result_list?.map_data?.[0]
+      if (result.error_response) {
+        console.warn('[TaobaoClient] product detail API error:', result.error_response)
+        return null
+      }
+
+      const data = result?.tbk_dg_material_optional_upgrade_response?.result_list?.map_data || result?.result_list?.[0]
       if (!data) {
         return null
       }
 
-      return {
-        itemId: data.item_id,
-        title: data.title,
-        price: data.zk_final_price || data.reserve_price || '',
-        originalPrice: data.reserve_price || '',
-        sales: data.volume ? `${data.volume}人付款` : '',
-        shopName: data.shop_title || data.nick || '',
-        shopScore: data.shop_dsr ? `${data.shop_dsr}/5.0` : '',
-        imageUrl: data.pict_url?.replace('http://', 'https://') || '',
-        buyUrl: data.coupon_share_url || data.url || '',
-        taoToken: '',
-        couponInfo: data.coupon_info || '',
-        couponAmount: data.coupon_amount ? `${data.coupon_amount}元` : '',
-        commissionRate: data.commission_rate ? `${data.commission_rate}%` : '',
-        platform: data.user_type === 1 ? 'tmall' : 'taobao',
-      }
+      return this.mapProduct(data)
     } catch (error: any) {
-      console.error('[TaobaoClient] 获取商品详情失败:', error)
+      console.error('[TaobaoClient] getProductDetail failed:', error)
       return null
     }
   }
 
   /**
-   * 检查 API 是否已配置
+   * Check whether API credentials are available
    */
   isConfigured(): boolean {
     return !this.isMock
@@ -369,13 +393,12 @@ class TaobaoClient {
    * 获取联盟推广搜索链接模板（前端用 keyword 替换占位符）
    */
   getAffiliateUrlTemplate(): string | null {
-    if (this.isMock || !this.pid) return null
-    const pidParts = this.pid.replace('mm_', '').split('_')
-    return `https://uland.taobao.com/sem/tbsearch?refpid=${this.pid}&keyword=__KEYWORD__&clk1=&upsId=${pidParts[2]}`
+    if (!this.pid || !this.adzoneId) return null
+    return `https://uland.taobao.com/sem/tbsearch?refpid=${this.pid}&keyword=__KEYWORD__&clk1=&upsId=${this.adzoneId}`
   }
 
   /**
-   * Mock 模式：不返回假价格，只提供淘宝搜索链接
+   * Mock mode: only return search links, no fake prices
    */
   private mockSearch(keyword: string): TaobaoProduct[] {
     return [{
@@ -387,7 +410,7 @@ class TaobaoClient {
       shopName: '',
       shopScore: '',
       imageUrl: '',
-      buyUrl: `https://s.taobao.com/search?q=${encodeURIComponent(keyword)}&sort=sale-desc`,
+      buyUrl: this.buildAffiliateSearchUrl(keyword),
       taoToken: '',
       couponInfo: '',
       couponAmount: '',
