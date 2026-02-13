@@ -31,6 +31,24 @@ USB Type-C 接口模块 x2`
 
   const allowedExtensions = ['.xlsx', '.xls', '.csv', '.pdf']
 
+  const buildProjectUrl = (projectId: string, parseEngine?: string, warnings?: unknown): string => {
+    const params = new URLSearchParams({
+      engine: parseEngine || 'unknown',
+    })
+
+    if (Array.isArray(warnings)) {
+      const fallbackWarning = warnings.find(
+        (warning): warning is string => typeof warning === 'string' && warning.startsWith('AI fallback:')
+      )
+
+      if (fallbackWarning) {
+        params.set('fallback', fallbackWarning.replace('AI fallback:', '').trim())
+      }
+    }
+
+    return `/bom/project/${projectId}?${params.toString()}`
+  }
+
   const handleFileSelect = (file: File) => {
     const ext = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!allowedExtensions.includes(ext)) {
@@ -76,7 +94,7 @@ USB Type-C 接口模块 x2`
       if (!res.ok) { setError(data.error || '解析失败'); return }
 
       setParseStatus('解析完成，正在跳转...')
-      router.push(`/bom/project/${data.project.id}?engine=${data.parseEngine || 'unknown'}`)
+      router.push(buildProjectUrl(data.project.id, data.parseEngine, data.warnings))
     } catch (err) {
       setError('网络错误，请重试')
       console.error(err)
@@ -112,7 +130,7 @@ USB Type-C 接口模块 x2`
       if (!res.ok) { setError(data.error || '解析失败'); return }
 
       setParseStatus('解析完成，正在跳转...')
-      router.push(`/bom/project/${data.project.id}?engine=${data.parseEngine || 'unknown'}`)
+      router.push(buildProjectUrl(data.project.id, data.parseEngine, data.warnings))
     } catch (err) {
       setError('网络错误，请重试')
       console.error(err)
