@@ -76,7 +76,7 @@ export default function LandingPage() {
             </motion.div>
 
             <h1 className="naruto-title mb-5 text-4xl font-black leading-tight text-orange-950 sm:text-6xl">
-              火影主题 AI 工程助手
+              木叶村 AI 工程助手
             </h1>
             <p className="mx-auto mb-8 max-w-3xl text-lg text-orange-900/85 sm:text-xl">
               咨询、检索、BOM 采购三线并行，像忍者小队协同一样把复杂工作拆解到可执行。
