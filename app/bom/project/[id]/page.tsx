@@ -92,9 +92,7 @@ export default function ProjectDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setApiConfigured(data.apiConfigured)
-        if (data.affiliateUrlTemplate) {
-          setAffiliateUrlTemplate(data.affiliateUrlTemplate)
-        }
+        setAffiliateUrlTemplate(typeof data.affiliateUrlTemplate === 'string' ? data.affiliateUrlTemplate : null)
       }
     } catch {}
   }
@@ -171,23 +169,36 @@ export default function ProjectDetailPage() {
   }
 
   const getTaobaoSearchUrl = (keyword: string) => {
-    const encodedKeyword = encodeURIComponent(keyword)
+    const normalizedKeyword = keyword.replace(/\s+/g, ' ').trim()
+    if (!normalizedKeyword) return 'https://s.taobao.com'
+    return `https://s.taobao.com/search?q=${encodeURIComponent(normalizedKeyword)}&sort=sale-desc`
+  }
+
+  const getTaobaoAffiliateSearchUrl = (keyword: string) => {
+    const normalizedKeyword = keyword.replace(/\s+/g, ' ').trim()
+    if (!normalizedKeyword) return 'https://s.taobao.com'
 
     if (!affiliateUrlTemplate) {
-      return `https://s.taobao.com/search?q=${encodedKeyword}&sort=sale-desc`
+      return getTaobaoSearchUrl(normalizedKeyword)
     }
 
-    // Keep affiliate link for commission and add a non-empty clk1 to improve stability.
+    const encodedKeyword = encodeURIComponent(normalizedKeyword)
     const clk1 = `${Date.now()}${Math.random().toString(36).slice(2, 8)}`
-    let url = affiliateUrlTemplate.replace('__KEYWORD__', encodedKeyword)
 
+    let url = affiliateUrlTemplate.replace('__KEYWORD__', encodedKeyword)
     if (url.includes('clk1=&')) {
       url = url.replace('clk1=&', `clk1=${clk1}&`)
-    } else if (url.endsWith('clk1=')) {
-      url = `${url}${clk1}`
     }
 
-    return url
+    try {
+      const parsed = new URL(url)
+      if (!parsed.searchParams.get('clk1')) {
+        parsed.searchParams.set('clk1', clk1)
+      }
+      return parsed.toString()
+    } catch {
+      return getTaobaoSearchUrl(normalizedKeyword)
+    }
   }
 
   const getLcscSearchUrl = (keyword: string) =>
@@ -227,18 +238,19 @@ export default function ProjectDetailPage() {
   }
 
   // 一键打开选中的链接（默认立创商城，电子元器件最佳平台）
-  const openSelectedLinks = (platform: 'lcsc' | '1688' | 'taobao' = 'lcsc') => {
+  const openSelectedLinks = (platform: 'lcsc' | '1688' | 'taobao' | 'taobao_affiliate' = 'lcsc') => {
     const targetItems = selectedItems.size > 0
       ? items.filter(i => selectedItems.has(i.id))
       : items
     const getUrl = (keyword: string) => {
       if (platform === 'lcsc') return getLcscSearchUrl(keyword)
       if (platform === '1688') return get1688SearchUrl(keyword)
+      if (platform === 'taobao_affiliate') return getTaobaoAffiliateSearchUrl(keyword)
       return getTaobaoSearchUrl(keyword)
     }
     const urls = targetItems.map(item => {
       const keyword = item.search_keyword || item.parsed_name || item.raw_input
-      return (apiConfigured && item.buy_url) ? item.buy_url : getUrl(keyword)
+      return getUrl(keyword)
     })
     // 第一个立即打开（用户点击上下文内，不会被拦截）
     if (urls.length > 0) {
@@ -266,7 +278,8 @@ export default function ProjectDetailPage() {
         const lcsc = getLcscSearchUrl(keyword)
         const ali = get1688SearchUrl(keyword)
         const taobao = getTaobaoSearchUrl(keyword)
-        return `${i.parsed_name || i.raw_input} x${i.quantity}:\n  立创: ${lcsc}\n  1688: ${ali}\n  淘宝: ${taobao}`
+        const taobaoAffiliate = getTaobaoAffiliateSearchUrl(keyword)
+        return `${i.parsed_name || i.raw_input} x${i.quantity}:\n  立创: ${lcsc}\n  1688: ${ali}\n  淘宝搜索: ${taobao}\n  淘宝联盟: ${taobaoAffiliate}`
       })
       .join('\n')
 
@@ -279,8 +292,8 @@ export default function ProjectDetailPage() {
 
   const exportCSV = () => {
     const headers = apiConfigured
-      ? ['元器件', '规格', '数量', '单价(元)', '小计(元)', '立创商城', '1688', '淘宝']
-      : ['元器件', '规格', '数量', '搜索关键词', '立创商城', '1688', '淘宝']
+      ? ['元器件', '规格', '数量', '单价(元)', '小计(元)', '立创商城', '1688', '淘宝搜索', '淘宝联盟']
+      : ['元器件', '规格', '数量', '搜索关键词', '立创商城', '1688', '淘宝搜索', '淘宝联盟']
 
     const rows = items.map(item => {
       const keyword = item.search_keyword || item.parsed_name || item.raw_input
@@ -293,6 +306,7 @@ export default function ProjectDetailPage() {
           getLcscSearchUrl(keyword),
           get1688SearchUrl(keyword),
           getTaobaoSearchUrl(keyword),
+          getTaobaoAffiliateSearchUrl(keyword),
         ]
       }
       return [
@@ -303,7 +317,8 @@ export default function ProjectDetailPage() {
         item.best_price ? String((item.best_price * item.quantity).toFixed(2)) : '',
         getLcscSearchUrl(keyword),
         get1688SearchUrl(keyword),
-        item.buy_url || getTaobaoSearchUrl(keyword),
+        getTaobaoSearchUrl(keyword),
+        getTaobaoAffiliateSearchUrl(keyword),
       ]
     })
 
@@ -483,7 +498,7 @@ export default function ProjectDetailPage() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-orange-800 mb-1">💡 智能采购助手</p>
               <p className="text-sm text-orange-700 leading-relaxed">
-                点击平台按钮将跳转到对应搜索页面查看全部商品：<span className="font-medium">「立创商城」</span>专注电子元器件（推荐），<span className="font-medium">「1688」</span>适合批量采购，<span className="font-medium">「淘宝」</span>适合零散购买。
+                点击平台按钮将跳转到对应搜索页面查看全部商品：<span className="font-medium">「立创商城」</span>专注电子元器件（推荐），<span className="font-medium">「1688」</span>适合批量采购，<span className="font-medium">「淘宝搜索」</span>更稳定，<span className="font-medium">「淘宝联盟」</span>支持返佣。
               </p>
               <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -524,10 +539,21 @@ export default function ProjectDetailPage() {
               whileTap={{ scale: 0.98 }}
               onClick={() => openSelectedLinks('taobao')}
               className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-orange-500 text-white font-semibold rounded-xl shadow-lg flex items-center gap-2"
-              title="在淘宝批量搜索"
+              title="在淘宝批量搜索（稳定）"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
               {selectedItems.size > 0 ? `淘宝搜 (${selectedItems.size})` : '淘宝搜索'}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => openSelectedLinks('taobao_affiliate')}
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-600 to-orange-500 text-white font-semibold rounded-xl shadow-lg flex items-center gap-2"
+              title="在淘宝联盟批量搜索（返佣）"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {selectedItems.size > 0 ? `联盟搜 (${selectedItems.size})` : '淘宝联盟'}
             </motion.button>
 
             <button
@@ -735,9 +761,20 @@ export default function ProjectDetailPage() {
                         rel="noopener noreferrer"
                         onClick={() => markVisited(item.id)}
                         className="px-2.5 py-1.5 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
-                        title="在淘宝搜索"
+                        title="在淘宝搜索（稳定）"
                       >
-                        淘宝
+                        淘宝搜
+                      </a>
+
+                      <a
+                        href={getTaobaoAffiliateSearchUrl(keyword)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markVisited(item.id)}
+                        className="px-2.5 py-1.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-100 transition-all"
+                        title="在淘宝联盟搜索（返佣）"
+                      >
+                        联盟
                       </a>
 
                       <button
@@ -873,7 +910,16 @@ export default function ProjectDetailPage() {
                         onClick={() => markVisited(item.id)}
                         className="px-3 py-2 bg-red-50 text-red-600 text-xs font-medium rounded-lg hover:bg-red-100 transition-all"
                       >
-                        淘宝
+                        淘宝搜
+                      </a>
+                      <a
+                        href={getTaobaoAffiliateSearchUrl(keyword)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() => markVisited(item.id)}
+                        className="px-3 py-2 bg-amber-50 text-amber-700 text-xs font-medium rounded-lg hover:bg-amber-100 transition-all"
+                      >
+                        联盟
                       </a>
                       {hasPriceData && item.search_results && item.search_results.length > 0 && (
                         <button

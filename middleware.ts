@@ -9,11 +9,8 @@ export function middleware(request: NextRequest) {
   const publicPaths = ['/login', '/register', '/landing', '/api/auth/login', '/api/auth/register']
 
   // 如果是公开路径，直接放行
+  // 说明：登录状态下也允许访问 /login 与 /register，避免无法切换账号
   if (publicPaths.some(path => pathname.startsWith(path))) {
-    // 如果已登录用户访问登录/注册页，重定向到聊天页面
-    if (token && (pathname === '/login' || pathname === '/register')) {
-      return NextResponse.redirect(new URL('/chat', request.url))
-    }
     return NextResponse.next()
   }
 

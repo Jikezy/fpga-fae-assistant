@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Language
-- Default collaboration language for this repository is **Simplified Chinese (????)**.
+- Default collaboration language for this repository is **Simplified Chinese (简体中文)**.
 - Please write new documentation, issue/PR descriptions, and review comments in Simplified Chinese unless an external integration explicitly requires English.
 
 ## Project Structure & Module Organization
