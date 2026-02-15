@@ -37,12 +37,7 @@ export class AIService {
    * 获取系统提示词
    */
   private getSystemPrompt(): string {
-    return `你是一个通用 AI 助手，可在 FPGA、硬件与软件领域提供支持。
-
-要求：
-1. 用户问“你是谁”时，先用简短自然语言介绍你的身份，不要输出模板化清单。
-2. 回答保持准确、清晰、友好；除非用户要求，不要冗长。
-3. 涉及技术问题时给出可执行建议，必要时补充示例。`
+    return ''
   }
 
   /**
@@ -74,6 +69,11 @@ export class AIService {
     messages: AIMessage[],
     onChunk: StreamCallback
   ): Promise<void> {
+    const systemPrompt = this.getSystemPrompt().trim()
+    const requestMessages = systemPrompt
+      ? [{ role: 'system' as const, content: systemPrompt }, ...messages]
+      : messages
+
     const response = await this.fetchWithTimeout(`${this.config.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -82,10 +82,7 @@ export class AIService {
       },
       body: JSON.stringify({
         model: this.config.model,
-        messages: [
-          { role: 'system', content: this.getSystemPrompt() },
-          ...messages,
-        ],
+        messages: requestMessages,
         max_tokens: 4096,
         stream: true,
       }),
@@ -110,6 +107,18 @@ export class AIService {
     messages: AIMessage[],
     onChunk: StreamCallback
   ): Promise<void> {
+    const systemPrompt = this.getSystemPrompt().trim()
+    const requestBody: Record<string, unknown> = {
+      model: this.config.model,
+      messages: messages,
+      max_tokens: 4096,
+      stream: true,
+    }
+
+    if (systemPrompt) {
+      requestBody.system = systemPrompt
+    }
+
     const response = await this.fetchWithTimeout(`${this.config.baseURL}/messages`, {
       method: 'POST',
       headers: {
@@ -119,13 +128,7 @@ export class AIService {
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'claude-code-20250219',
       },
-      body: JSON.stringify({
-        model: this.config.model,
-        system: this.getSystemPrompt(),
-        messages: messages,
-        max_tokens: 4096,
-        stream: true,
-      }),
+      body: JSON.stringify(requestBody),
     })
 
     if (!response.ok) {

@@ -7,6 +7,13 @@ import { requireAuth } from '@/lib/auth-middleware'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
+function isIdentityModelQuestion(text: string): boolean {
+  const normalized = text.trim().toLowerCase()
+  if (!normalized) return false
+
+  return /你是谁|你是什么模型|当前模型|你用的什么模型|model name|what model|who are you/.test(normalized)
+}
+
 export async function POST(req: NextRequest) {
   // 验证用户登录
   const authResult = await requireAuth(req)
@@ -51,6 +58,9 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const lastIncomingMessage = messages[messages.length - 1]
+    const bypassRag = lastIncomingMessage?.role === 'user' && isIdentityModelQuestion(lastIncomingMessage.content || '')
+
     // 创建 AI 服务实例
     const aiService = new AIService({ apiKey, baseURL, model, format: user.api_format || 'auto' })
 
@@ -58,7 +68,7 @@ export async function POST(req: NextRequest) {
     let enhancedMessages = [...messages]
     const lastMessage = messages[messages.length - 1]
 
-    if (lastMessage?.role === 'user') {
+    if (lastMessage?.role === 'user' && !bypassRag) {
       try {
         const vectorStore = getVectorStore()
         await vectorStore.initialize()
