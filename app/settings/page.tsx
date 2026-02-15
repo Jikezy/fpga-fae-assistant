@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 const PRESETS = [
   { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'claude-sonnet-4-5-20250929', hint: 'openclaudecode.cn 获取 Key', format: 'auto' as const },
   { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key', format: 'openai' as const },
+  { name: '豆包 2.0 Pro', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2.0-pro', hint: '火山方舟获取 Key', format: 'openai' as const },
 ]
 
 export default function SettingsPage() {
@@ -263,7 +264,7 @@ export default function SettingsPage() {
                 className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100 placeholder-gray-400"
               />
               <p className="mt-1 text-xs text-gray-400">
-                OpenAI 兼容格式的 API 地址，必须以 /v1 结尾
+                OpenAI 兼容地址，常见为 /v1；火山方舟通常是 /api/v3
               </p>
             </div>
 

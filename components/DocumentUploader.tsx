@@ -57,7 +57,10 @@ export default function DocumentUploader({ onUploadSuccess }: DocumentUploaderPr
         throw new Error(result.error || '上传失败')
       }
 
-      setSuccess(`文档上传成功！共处理 ${result.data.chunks} 个文本片段`)
+      const multimodalTips = result?.data?.multimodalEnhanced
+        ? `（含 ${result.data.multimodalChunks || 0} 个豆包多模态增强片段）`
+        : ''
+      setSuccess(`文档上传成功！共处理 ${result.data.chunks} 个文本片段${multimodalTips}`)
       onUploadSuccess?.()
 
       // 3秒后清除成功消息

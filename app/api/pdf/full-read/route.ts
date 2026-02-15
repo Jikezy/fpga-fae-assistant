@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-middleware'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
+
+const MULTIMODAL_MAX_FILE_SIZE_MB = 8
+
+type UserAiConfigRow = {
+  anthropic_api_key: string | null
+  anthropic_base_url: string | null
+  ai_model: string | null
+  api_format: 'auto' | 'openai' | 'anthropic' | null
+}
 
 /**
  * 完整PDF阅读接口
@@ -60,10 +69,12 @@ export async function POST(req: NextRequest) {
       WHERE id = ${authResult.user.id}
     `
 
-    const user = userConfig.length > 0 ? (userConfig[0] as any) : null
-    const apiKey = user?.anthropic_api_key
-    const baseURL = user?.anthropic_base_url
-    const model = user?.ai_model
+    const user = userConfig.length > 0
+      ? (userConfig[0] as UserAiConfigRow)
+      : null
+    const apiKey = user?.anthropic_api_key?.trim() || ''
+    const baseURL = user?.anthropic_base_url?.trim() || ''
+    const model = user?.ai_model?.trim() || ''
 
     // BYOK：未配置则 403
     if (!apiKey || !baseURL || !model) {
@@ -76,10 +87,20 @@ export async function POST(req: NextRequest) {
 
     // 读取PDF文件内容
     const bytes = await file.arrayBuffer()
+    const buffer = Buffer.from(bytes)
 
     // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
-    const aiService = new AIService({ apiKey, baseURL, model, format: user?.api_format || 'auto' })
+    const aiService = new AIService({
+      apiKey,
+      baseURL,
+      model,
+      format: user?.api_format || 'auto',
+    })
+    const {
+      answerPdfQuestionWithDoubao,
+      isDoubaoMultimodalModel,
+    } = await import('@/lib/pdf-multimodal')
 
     // 创建流式响应
     const encoder = new TextEncoder()
@@ -96,27 +117,47 @@ export async function POST(req: NextRequest) {
           })
           controller.enqueue(encoder.encode(`data: ${costInfo}\n\n`))
 
-          // 提取PDF文本内容
-          const { processPDF } = await import('@/lib/pdfProcessor')
-          const buffer = Buffer.from(bytes)
-          const processed = await processPDF(buffer, file.name)
+          const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'
 
-          // 合并所有文档片段
+          const useDoubaoMultimodal =
+            fileSizeMB <= MULTIMODAL_MAX_FILE_SIZE_MB &&
+            isDoubaoMultimodalModel(model, baseURL)
+
+          if (useDoubaoMultimodal) {
+            const answer = await answerPdfQuestionWithDoubao(buffer, file.name, userQuestion, {
+              apiKey,
+              baseURL,
+              model,
+            })
+
+            if (answer) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'mode',
+                mode: 'doubao-multimodal',
+              })}\n\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                type: 'content',
+                content: answer,
+              })}\n\n`))
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+              controller.close()
+              return
+            }
+          }
+
+          // 提取PDF文本内容（兜底：当多模态不可用时）
+          const { processPDF } = await import('@/lib/pdfProcessor')
+          const processed = await processPDF(buffer, file.name)
           const fullContent = processed.documents
             .map(doc => `[第${doc.metadata.page}页]\n${doc.content}`)
             .join('\n\n')
 
-          const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'
-
-          const messages = [
+          await aiService.streamChat([
             {
               role: 'user' as const,
               content: `我上传了一个PDF文档（${file.name}，共${processed.totalPages}页）。以下是完整内容：\n\n${fullContent}\n\n问题：${userQuestion}`,
             },
-          ]
-
-          // 流式调用AI
-          await aiService.streamChat(messages, (chunk) => {
+          ], (chunk) => {
             const data = JSON.stringify({ type: 'content', content: chunk })
             controller.enqueue(encoder.encode(`data: ${data}\n\n`))
           })
