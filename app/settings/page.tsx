@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 const PRESETS = [
   { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'claude-sonnet-4-5-20250929', hint: 'openclaudecode.cn 获取 Key', format: 'auto' as const },
   { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key', format: 'openai' as const },
-  { name: '豆包 2.0 Pro', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2.0-pro', hint: '火山方舟获取 Key', format: 'openai' as const },
+  { name: '豆包 2.0 Pro', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-pro-260215', hint: '火山方舟获取 Key', format: 'openai' as const },
 ]
 
 export default function SettingsPage() {

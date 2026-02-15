@@ -49,6 +49,31 @@ export class AIService {
     return isArkBase && !isEndpointId
   }
 
+  private getArkModelCandidates(): string[] {
+    const rawModel = this.config.model.trim()
+    const candidates: string[] = []
+    const pushUnique = (value: string) => {
+      const normalized = value.trim()
+      if (!normalized) return
+      if (!candidates.some(item => item.toLowerCase() === normalized.toLowerCase())) {
+        candidates.push(normalized)
+      }
+    }
+
+    pushUnique(rawModel)
+
+    const dottedLegacy = /^doubao-seed-2\.0-pro$/i
+    if (dottedLegacy.test(rawModel)) {
+      pushUnique('doubao-seed-2-0-pro-260215')
+    }
+
+    if (rawModel.includes('.')) {
+      pushUnique(rawModel.replace(/\./g, '-'))
+    }
+
+    return candidates
+  }
+
   /**
    * 带超时的 fetch
    */
@@ -196,43 +221,57 @@ export class AIService {
       .trim()
 
     const prompt = conversation || '请直接回复用户。'
-    const response = await this.fetchWithTimeout(`${this.config.baseURL}/responses`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.config.model,
-        input: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'input_text',
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        temperature: 0.2,
-        max_output_tokens: 4096,
-      }),
-    })
+    const modelCandidates = this.getArkModelCandidates()
+    let lastError = ''
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '')
-      throw new Error(`Ark Responses API 错误 (${response.status}): ${errorText}`)
+    for (const modelCandidate of modelCandidates) {
+      const response = await this.fetchWithTimeout(`${this.config.baseURL}/responses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: modelCandidate,
+          input: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'input_text',
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          temperature: 0.2,
+          max_output_tokens: 4096,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '')
+        lastError = `Ark Responses API 错误 (${response.status}): ${errorText}`
+        const modelNotFound = response.status === 404 && /InvalidEndpointOrModel\.NotFound/i.test(errorText)
+        if (modelNotFound) {
+          continue
+        }
+        throw new Error(lastError)
+      }
+
+      const payload = await response.json()
+      const outputText = this.extractResponsesText(payload)
+
+      if (!outputText) {
+        lastError = 'Ark Responses API 返回为空'
+        continue
+      }
+
+      onChunk(outputText)
+      return
     }
 
-    const payload = await response.json()
-    const outputText = this.extractResponsesText(payload)
-
-    if (!outputText) {
-      throw new Error('Ark Responses API 返回为空')
-    }
-
-    onChunk(outputText)
+    throw new Error(lastError || 'Ark Responses API 调用失败')
   }
 
   /**
