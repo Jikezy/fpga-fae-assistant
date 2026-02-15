@@ -40,6 +40,15 @@ export class AIService {
     return ''
   }
 
+  private isArkResponsesMode(): boolean {
+    const base = this.config.baseURL.trim().toLowerCase()
+    const model = this.config.model.trim().toLowerCase()
+    const isArkBase = base.includes('volces.com') || base.includes('ark.cn-')
+    const isEndpointId = model.startsWith('ep-')
+
+    return isArkBase && !isEndpointId
+  }
+
   /**
    * 带超时的 fetch
    */
@@ -144,6 +153,88 @@ export class AIService {
     })
   }
 
+  private extractResponsesText(payload: unknown): string {
+    const texts: string[] = []
+
+    const pushText = (value: unknown) => {
+      if (typeof value === 'string' && value.trim()) {
+        texts.push(value.trim())
+      }
+    }
+
+    if (!payload || typeof payload !== 'object') {
+      return ''
+    }
+
+    const root = payload as Record<string, unknown>
+    pushText(root.output_text)
+
+    const output = Array.isArray(root.output) ? root.output : []
+    for (const item of output) {
+      if (!item || typeof item !== 'object') continue
+      const outputItem = item as Record<string, unknown>
+      pushText(outputItem.text)
+
+      const content = Array.isArray(outputItem.content) ? outputItem.content : []
+      for (const block of content) {
+        if (!block || typeof block !== 'object') continue
+        const contentBlock = block as Record<string, unknown>
+        pushText(contentBlock.text)
+      }
+    }
+
+    return texts.join('\n').trim()
+  }
+
+  private async streamChatArkResponses(
+    messages: AIMessage[],
+    onChunk: StreamCallback
+  ): Promise<void> {
+    const conversation = messages
+      .map((message) => `${message.role === 'user' ? '用户' : '助手'}：${message.content}`)
+      .join('\n\n')
+      .trim()
+
+    const prompt = conversation || '请直接回复用户。'
+    const response = await this.fetchWithTimeout(`${this.config.baseURL}/responses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.config.model,
+        input: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        temperature: 0.2,
+        max_output_tokens: 4096,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '')
+      throw new Error(`Ark Responses API 错误 (${response.status}): ${errorText}`)
+    }
+
+    const payload = await response.json()
+    const outputText = this.extractResponsesText(payload)
+
+    if (!outputText) {
+      throw new Error('Ark Responses API 返回为空')
+    }
+
+    onChunk(outputText)
+  }
+
   /**
    * 通用 SSE 流读取
    */
@@ -193,8 +284,13 @@ export class AIService {
     }
 
     const format = this.config.format || 'auto'
+    const preferArkResponses = this.isArkResponsesMode()
 
     if (format === 'openai') {
+      if (preferArkResponses) {
+        await this.streamChatArkResponses(messages, onChunk)
+        return
+      }
       await this.streamChatOpenAI(messages, onChunk)
       return
     }
@@ -206,6 +302,10 @@ export class AIService {
 
     // auto: 先试 OpenAI 格式
     try {
+      if (preferArkResponses) {
+        await this.streamChatArkResponses(messages, onChunk)
+        return
+      }
       await this.streamChatOpenAI(messages, onChunk)
       return
     } catch (openaiError) {
