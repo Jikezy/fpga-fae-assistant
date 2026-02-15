@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { AIService } from '@/lib/ai-service'
-import { getVectorStore } from '@/lib/simpleVectorStore'
+import { getRAGClient } from '@/lib/ragClient'
 import { requireAuth } from '@/lib/auth-middleware'
 
 // 使用 Node.js runtime
@@ -54,77 +54,66 @@ export async function POST(req: NextRequest) {
     // 创建 AI 服务实例
     const aiService = new AIService({ apiKey, baseURL, model, format: user.api_format || 'auto' })
 
-    // RAG: 检索相关文档
+    // RAG: 通过 RAG 后端检索相关文档
     let enhancedMessages = [...messages]
     const lastMessage = messages[messages.length - 1]
 
     if (lastMessage?.role === 'user') {
       try {
-        const vectorStore = getVectorStore()
-        await vectorStore.initialize()
+        const ragClient = getRAGClient()
 
         console.log('用户问题:', lastMessage.content)
 
-        // 检查是否有文档（只查询当前用户的文档）
-        const allDocs = await vectorStore.listDocuments(authResult.user.id)
-        console.log(`用户 ${authResult.user.id} 的向量存储中共有 ${allDocs.length} 个文档文件:`, allDocs.map(d => d.source))
+        const relevantDocs = await ragClient.search(authResult.user.id, lastMessage.content, 8)
+        console.log(`检索到 ${relevantDocs.length} 个相关文档片段`)
 
-        if (allDocs.length === 0) {
-          console.log('警告: 该用户的向量存储为空，没有可搜索的文档')
-        } else {
-          console.log('开始搜索文档，查询内容:', lastMessage.content)
-          const relevantDocs = await vectorStore.search(lastMessage.content, 8, authResult.user.id) // 只搜索当前用户的文档
-          console.log(`检索到 ${relevantDocs.length} 个相关文档片段`)
+        if (relevantDocs.length > 0) {
+          // 按文档来源分组
+          const docsBySource = new Map<string, typeof relevantDocs>()
+          relevantDocs.forEach(doc => {
+            const source = doc.metadata.source
+            if (!docsBySource.has(source)) {
+              docsBySource.set(source, [])
+            }
+            docsBySource.get(source)!.push(doc)
+          })
 
-          if (relevantDocs.length > 0) {
-            // 按文档来源分组
-            const docsBySource = new Map<string, typeof relevantDocs>()
-            relevantDocs.forEach(doc => {
-              const source = doc.metadata.source
-              if (!docsBySource.has(source)) {
-                docsBySource.set(source, [])
-              }
-              docsBySource.get(source)!.push(doc)
+          console.log(`文档片段来自 ${docsBySource.size} 个不同的文件`)
+
+          // 构建上下文信息
+          const contextParts: string[] = []
+          let chunkIndex = 1
+
+          docsBySource.forEach((docs, source) => {
+            const fileName = source.split(/[/\\]/).pop() || source
+            const shortName = fileName.length > 80 ? fileName.substring(0, 77) + '...' : fileName
+
+            contextParts.push(`\n===== 文档${docsBySource.size > 1 ? chunkIndex : ''}：${shortName} =====`)
+
+            docs.forEach((doc) => {
+              const pageInfo = doc.metadata.page ? `[第${doc.metadata.page}页]` : '[位置未知]'
+              contextParts.push(`\n${pageInfo}\n${doc.text.trim()}\n`)
             })
 
-            console.log(`文档片段来自 ${docsBySource.size} 个不同的PDF文件`)
+            console.log(`文档 ${shortName}: 包含 ${docs.length} 个相关片段`)
+            chunkIndex++
+          })
 
-            // 构建上下文信息
-            const contextParts: string[] = []
-            let chunkIndex = 1
+          const context = contextParts.join('\n')
 
-            docsBySource.forEach((docs, source) => {
-              // 提取简短的文件名
-              const fileName = source.split(/[/\\]/).pop() || source
-              const shortName = fileName.length > 80 ? fileName.substring(0, 77) + '...' : fileName
-
-              contextParts.push(`\n===== 文档${docsBySource.size > 1 ? chunkIndex : ''}：${shortName} =====`)
-
-              docs.forEach((doc) => {
-                const pageInfo = doc.metadata.page ? `[第${doc.metadata.page}页]` : '[位置未知]'
-                contextParts.push(`\n${pageInfo}\n${doc.content.trim()}\n`)
-              })
-
-              console.log(`文档 ${shortName}: 包含 ${docs.length} 个相关片段`)
-              chunkIndex++
-            })
-
-            const context = contextParts.join('\n')
-
-            // 构建增强的用户消息（把 context 拼接到用户问题前面）
-            const docCount = docsBySource.size
-            const enhancedUserMessage = docCount === 1
-              ? `【参考文档】用户上传了1个PDF文档，以下是相关内容：
+          const docCount = docsBySource.size
+          const enhancedUserMessage = docCount === 1
+            ? `【参考文档】用户上传了1个文档，以下是相关内容：
 
 ${context}
 
 【用户问题】${lastMessage.content}
 
 【回答要求】
-1. 基于以上PDF文档内容详细回答用户的问题
+1. 基于以上文档内容详细回答用户的问题
 2. 引用时说"根据文档第X页"或"文档中提到"
 3. 综合所有片段内容，给出完整、详细的回答`
-              : `【参考文档】用户上传了${docCount}个PDF文档，以下是相关内容：
+            : `【参考文档】用户上传了${docCount}个文档，以下是相关内容：
 
 ${context}
 
@@ -135,43 +124,16 @@ ${context}
 2. 回答时明确区分不同文档的内容，例如："第一个文档（XX）中提到..."
 3. 综合所有文档的内容，给出完整、详细的回答`
 
-            // 替换最后一条用户消息
-            enhancedMessages = [
-              ...messages.slice(0, -1),
-              {
-                role: 'user',
-                content: enhancedUserMessage
-              }
-            ]
+          // 替换最后一条用户消息
+          enhancedMessages = [
+            ...messages.slice(0, -1),
+            {
+              role: 'user',
+              content: enhancedUserMessage
+            }
+          ]
 
-            console.log('已将检索到的文档添加到用户消息中')
-          } else {
-            // 未检索到相关内容，但告诉AI用户有哪些文档
-            console.log('未找到相关文档，但会告诉AI用户有哪些文档可用')
-            const fileList = allDocs.map(d => {
-              const fileName = d.source.split(/[/\\]/).pop() || d.source
-              return `- ${fileName} (${d.chunks}个片段)`
-            }).join('\n')
-
-            const enhancedUserMessage = `【文档信息】用户上传了${allDocs.length}个PDF文档：
-
-${fileList}
-
-【用户问题】${lastMessage.content}
-
-【说明】针对当前问题，我没有找到特别相关的内容片段。请告诉用户：
-1. 你已经上传了这些文档
-2. 当前问题可能需要更具体的关键词，或者可以使用"完整阅读"功能来深入分析整个文档
-3. 如果用户想了解文档内容，建议使用侧边栏的"完整阅读"按钮`
-
-            enhancedMessages = [
-              ...messages.slice(0, -1),
-              {
-                role: 'user',
-                content: enhancedUserMessage
-              }
-            ]
-          }
+          console.log('已将检索到的文档添加到用户消息中')
         }
       } catch (error) {
         console.error('文档检索失败:', error)
@@ -184,7 +146,6 @@ ${fileList}
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // 使用统一的 AI 服务接口，传递增强后的消息
           await aiService.streamChat(enhancedMessages, (chunk) => {
             const data = JSON.stringify({ content: chunk })
             controller.enqueue(encoder.encode(`data: ${data}\n\n`))
