@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 
 // 预设平台配置
 const PRESETS = [
-  { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'codex5.3', hint: 'openclaudecode.cn 获取 Key', format: 'auto' as const },
+  { name: '米醋 API', baseUrl: 'https://www.openclaudecode.cn/v1', model: 'claude-sonnet-4-5-20250929', hint: 'openclaudecode.cn 获取 Key', format: 'auto' as const },
   { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key', format: 'openai' as const },
 ]
 
