@@ -1,16 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import MessageList from './MessageList'
 import ChatInput from './ChatInput'
+import { useChatStore, type Message } from '@/lib/chat-store'
 
-export interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-}
+export type { Message } from '@/lib/chat-store'
 
 interface ChatInterfaceProps {
   fullReadRequest?: string | null
@@ -19,8 +15,7 @@ interface ChatInterfaceProps {
 
 export default function ChatInterface({ fullReadRequest, onFullReadComplete }: ChatInterfaceProps) {
   const router = useRouter()
-  const [messages, setMessages] = useState<Message[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const { messages, isLoading, setMessages, setIsLoading } = useChatStore()
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -42,6 +37,17 @@ export default function ChatInterface({ fullReadRequest, onFullReadComplete }: C
     }
     checkConfig()
   }, [])
+
+  // 导航离开时中止流（保留已收到的内容）
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+        setIsLoading(false)
+      }
+    }
+  }, [setIsLoading])
 
   // 检查是否接近底部
   const checkIfNearBottom = () => {
@@ -75,7 +81,7 @@ export default function ChatInterface({ fullReadRequest, onFullReadComplete }: C
       handleFullRead(fullReadRequest)
       onFullReadComplete?.()
     }
-  }, [fullReadRequest])
+  }, [fullReadRequest, onFullReadComplete])
 
   // 停止生成
   const handleStop = () => {
@@ -339,7 +345,7 @@ export default function ChatInterface({ fullReadRequest, onFullReadComplete }: C
         /* 欢迎界面 */
         <div className="flex-1 flex items-center justify-center px-4 overflow-y-auto">
           <div className="text-center max-w-2xl mx-auto py-8">
-            {/* Logo */}
+            {/* 品牌标识：保持首页与对话页视觉连续性 */}
             <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-[0_10px_28px_rgba(171,64,17,0.35)]">
               <svg className="w-9 h-9 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
