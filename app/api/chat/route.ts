@@ -53,15 +53,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 获取用户的AI配置
+    // 并行：迁移检查 + 用户配置查询
     const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
-    await ensureAiModelColumn()
     const sql = getSql()
-    const userConfig = await sql`
-      SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format
-      FROM users
-      WHERE id = ${authResult.user.id}
-    `
+    const [, userConfig] = await Promise.all([
+      ensureAiModelColumn(),
+      sql`SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format FROM users WHERE id = ${authResult.user.id}`,
+    ])
 
     if (userConfig.length === 0) {
       return new Response(
