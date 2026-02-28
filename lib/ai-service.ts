@@ -20,8 +20,23 @@ export interface AIServiceConfig {
 // 流式响应回调
 export type StreamCallback = (chunk: string) => void
 
-// 30 秒超时
-const FETCH_TIMEOUT = 30000
+interface OpenAiStreamPayload {
+  choices?: Array<{
+    delta?: {
+      content?: string
+    }
+  }>
+}
+
+interface AnthropicStreamPayload {
+  type?: string
+  delta?: {
+    text?: string
+  }
+}
+
+// 90 秒超时（留出 AI 思考时间）
+const FETCH_TIMEOUT = 90000
 
 /**
  * AI 服务类（自动检测 OpenAI / Anthropic 格式）
@@ -88,7 +103,9 @@ export class AIService {
       return response
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new Error(`AI API 请求超时（${FETCH_TIMEOUT / 1000}秒），请检查 Base URL 是否正确`)
+        const err = new Error(`AI API 请求超时（${FETCH_TIMEOUT / 1000}秒），请检查 Base URL 是否正确`) as Error & { isTimeout: boolean }
+        err.isTimeout = true
+        throw err
       }
       throw error
     } finally {
@@ -128,7 +145,8 @@ export class AIService {
     }
 
     await this.readSSEStream(response, (data) => {
-      const content = data.choices?.[0]?.delta?.content
+      const payload = data as OpenAiStreamPayload
+      const content = payload.choices?.[0]?.delta?.content
       if (content) onChunk(content)
     })
   }
@@ -171,9 +189,10 @@ export class AIService {
     }
 
     await this.readSSEStream(response, (data) => {
-      // Anthropic SSE: event: content_block_delta, data: { delta: { text: "..." } }
-      if (data.type === 'content_block_delta' && data.delta?.text) {
-        onChunk(data.delta.text)
+      // Anthropic 流式增量格式：event=content_block_delta，正文在 delta.text
+      const payload = data as AnthropicStreamPayload
+      if (payload.type === 'content_block_delta' && payload.delta?.text) {
+        onChunk(payload.delta.text)
       }
     })
   }
@@ -279,7 +298,7 @@ export class AIService {
    */
   private async readSSEStream(
     response: Response,
-    onData: (parsed: any) => void
+    onData: (parsed: unknown) => void
   ): Promise<void> {
     const reader = response.body?.getReader()
     if (!reader) throw new Error('无法读取响应流')
@@ -305,7 +324,7 @@ export class AIService {
           const parsed = JSON.parse(data)
           onData(parsed)
         } catch {
-          // skip malformed JSON lines
+          // 容错策略：忽略单行坏 JSON，继续消费后续 SSE 数据
         }
       }
     }
@@ -339,7 +358,7 @@ export class AIService {
       return
     }
 
-    // auto: 先试 OpenAI 格式
+    // `auto` 模式：先走 OpenAI 兼容协议，失败后再降级
     try {
       if (preferArkResponses) {
         await this.streamChatArkResponses(messages, onChunk)
@@ -348,11 +367,15 @@ export class AIService {
       await this.streamChatOpenAI(messages, onChunk)
       return
     } catch (openaiError) {
+      // 超时错误不再重试（重试只会再等一倍时间，意义不大）
+      if (openaiError instanceof Error && (openaiError as Error & { isTimeout?: boolean }).isTimeout) {
+        throw openaiError
+      }
       const msg = openaiError instanceof Error ? openaiError.message : ''
       console.log(`OpenAI 格式失败 (${msg})，尝试 Anthropic 原生格式...`)
     }
 
-    // OpenAI 失败，尝试 Anthropic 原生格式
+    // 降级路径：OpenAI 兼容失败后切换 Anthropic 原生协议
     await this.streamChatAnthropic(messages, onChunk)
   }
 

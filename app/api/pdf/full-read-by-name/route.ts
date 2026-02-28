@@ -3,13 +3,24 @@ import { requireAuth } from '@/lib/auth-middleware'
 import { getVectorStore } from '@/lib/simpleVectorStore'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
+
+interface FullReadUserConfigRow {
+  anthropic_api_key: string | null
+  anthropic_base_url: string | null
+  ai_model: string | null
+  api_format: 'auto' | 'openai' | 'anthropic' | null
+}
+
+interface DocumentContentRow {
+  content: string
+  page: number | null
+}
 
 /**
- * 通过文件名进行完整PDF阅读
+ * 通过文件名进行完整 PDF 阅读
  */
 export async function POST(req: NextRequest) {
-  // 验证用户登录
   const authResult = await requireAuth(req)
   if (authResult.error) {
     return authResult.error
@@ -18,17 +29,17 @@ export async function POST(req: NextRequest) {
   try {
     const { filename, question } = await req.json()
 
-    if (!filename) {
+    if (!filename || typeof filename !== 'string') {
       return NextResponse.json(
         { error: '缺少文件名参数' },
         { status: 400 }
       )
     }
 
-    // 获取用户的AI配置
     const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
     await ensureAiModelColumn()
     const sql = getSql()
+
     const userConfig = await sql`
       SELECT anthropic_api_key, anthropic_base_url, ai_model, api_format
       FROM users
@@ -42,12 +53,11 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const user = userConfig[0] as any
-    const apiKey = user.anthropic_api_key
-    const baseURL = user.anthropic_base_url
-    const model = user.ai_model
+    const user = userConfig[0] as FullReadUserConfigRow
+    const apiKey = user.anthropic_api_key?.trim() || ''
+    const baseURL = user.anthropic_base_url?.trim() || ''
+    const model = user.ai_model?.trim() || ''
 
-    // BYOK：未配置则 403
     if (!apiKey || !baseURL || !model) {
       return NextResponse.json({
         error: 'AI 未配置',
@@ -56,7 +66,6 @@ export async function POST(req: NextRequest) {
       }, { status: 403 })
     }
 
-    // 从数据库获取该文件的所有文档片段（仅当前用户的）
     const vectorStore = getVectorStore()
     await vectorStore.initialize()
 
@@ -64,7 +73,7 @@ export async function POST(req: NextRequest) {
       SELECT content, page
       FROM documents
       WHERE source = ${filename} AND user_id = ${authResult.user.id}
-      ORDER BY page ASC
+      ORDER BY page ASC NULLS LAST, created_at ASC
     `
 
     if (documents.length === 0) {
@@ -74,46 +83,66 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // 合并所有文档片段
-    const fullContent = documents
-      .map((doc: any) => `[第${doc.page}页]\n${doc.content}`)
+    const mergedRows = documents as DocumentContentRow[]
+    const fullContent = mergedRows
+      .map((doc, index) => {
+        const pageLabel =
+          typeof doc.page === 'number' && Number.isFinite(doc.page)
+            ? `第${doc.page}页`
+            : `补充片段${index + 1}`
+        return `[${pageLabel}]\n${doc.content}`
+      })
       .join('\n\n')
+      .trim()
 
-    const totalPages = Math.max(...documents.map((doc: any) => doc.page || 0))
+    if (!fullContent) {
+      return NextResponse.json(
+        { error: '文档内容为空，无法分析' },
+        { status: 400 }
+      )
+    }
 
-    // 估算token
-    const estimatedInputTokens = fullContent.length / 4
+    const pageNumbers = mergedRows
+      .map(doc => doc.page)
+      .filter((page): page is number => typeof page === 'number' && Number.isFinite(page) && page > 0)
+    const totalPages = pageNumbers.length > 0 ? Math.max(...pageNumbers) : 0
+
+    const estimatedInputTokens = Math.ceil(fullContent.length / 4)
     const estimatedOutputTokens = 1500
 
-    // 调用AI服务
     const { AIService } = await import('@/lib/ai-service')
-    const aiService = new AIService({ apiKey, baseURL, model, format: user.api_format || 'auto' })
+    const aiService = new AIService({
+      apiKey,
+      baseURL,
+      model,
+      format: user.api_format || 'auto',
+    })
 
-    const userQuestion = question || '请详细分析这个PDF文档的内容，包括主要主题、关键信息和技术细节。'
+    const userQuestion =
+      typeof question === 'string' && question.trim()
+        ? question.trim()
+        : '请详细分析这个 PDF 文档的内容，包括核心主题、关键参数和工程注意点。'
 
     const messages = [
       {
         role: 'user' as const,
-        content: `我有一个PDF文档（${filename}，共${totalPages}页）。以下是完整内容：\n\n${fullContent}\n\n问题：${userQuestion}`,
+        content: `我有一个 PDF 文档（${filename}，约 ${Math.max(totalPages, 1)} 页）。以下是完整内容：\n\n${fullContent}\n\n问题：${userQuestion}`,
       },
     ]
 
-    // 创建流式响应
     const encoder = new TextEncoder()
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // 发送费用信息
           const costInfo = JSON.stringify({
             type: 'cost_estimate',
-            estimatedPages: totalPages,
-            estimatedInputTokens: Math.ceil(estimatedInputTokens),
+            estimatedPages: Math.max(totalPages, 1),
+            estimatedInputTokens,
             estimatedOutputTokens,
             totalCost: '0.00',
           })
           controller.enqueue(encoder.encode(`data: ${costInfo}\n\n`))
 
-          // 流式调用AI
           await aiService.streamChat(messages, (chunk) => {
             const data = JSON.stringify({ type: 'content', content: chunk })
             controller.enqueue(encoder.encode(`data: ${data}\n\n`))
@@ -122,7 +151,7 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode('data: [DONE]\n\n'))
           controller.close()
         } catch (error) {
-          console.error('完整PDF阅读失败:', error)
+          console.error('完整 PDF 阅读失败:', error)
           const errorData = JSON.stringify({
             type: 'error',
             content: `分析失败：${error instanceof Error ? error.message : '未知错误'}`,

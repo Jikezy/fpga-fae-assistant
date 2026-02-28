@@ -3,9 +3,21 @@ import { AIService } from '@/lib/ai-service'
 import { getVectorStore } from '@/lib/simpleVectorStore'
 import { requireAuth } from '@/lib/auth-middleware'
 
+type ChatRequestMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+interface ChatUserConfigRow {
+  anthropic_api_key: string | null
+  anthropic_base_url: string | null
+  ai_model: string | null
+  api_format: 'auto' | 'openai' | 'anthropic' | null
+}
+
 // 使用 Node.js runtime
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
 
 function isIdentityModelQuestion(text: string): boolean {
   const normalized = text.trim().toLowerCase()
@@ -22,7 +34,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages } = await req.json()
+    const body = await req.json() as { messages?: unknown }
+    const messages = Array.isArray(body.messages)
+      ? body.messages.filter(
+          (message): message is ChatRequestMessage =>
+            !!message &&
+            typeof message === 'object' &&
+            ((message as { role?: unknown }).role === 'user' ||
+              (message as { role?: unknown }).role === 'assistant') &&
+            typeof (message as { content?: unknown }).content === 'string'
+        )
+      : []
+
+    if (messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: '消息格式错误' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
     // 获取用户的AI配置
     const { getSql, ensureAiModelColumn } = await import('@/lib/db-schema')
@@ -41,7 +70,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const user = userConfig[0] as any
+    const user = userConfig[0] as ChatUserConfigRow
     const apiKey = user.anthropic_api_key
     const baseURL = user.anthropic_base_url
     const model = user.ai_model
