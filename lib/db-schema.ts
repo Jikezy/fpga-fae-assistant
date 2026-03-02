@@ -64,6 +64,36 @@ export async function initializeDatabase() {
       )
     `
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS document_entities (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        source TEXT NOT NULL,
+        page INTEGER,
+        entity_value TEXT NOT NULL,
+        entity_norm TEXT NOT NULL,
+        entity_type TEXT NOT NULL DEFAULT 'keyword',
+        weight REAL NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS document_graph_edges (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        source TEXT NOT NULL,
+        page INTEGER,
+        from_entity TEXT NOT NULL,
+        to_entity TEXT NOT NULL,
+        relation TEXT NOT NULL DEFAULT 'co_occurs',
+        weight REAL NOT NULL DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+
     // 创建索引以提高查询性能
     await sql`
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)
@@ -86,11 +116,54 @@ export async function initializeDatabase() {
     `
 
     await sql`
+      CREATE INDEX IF NOT EXISTS idx_documents_user_source_page
+      ON documents(user_id, source, page)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_documents_fts
+      ON documents
+      USING GIN (
+        to_tsvector('simple', COALESCE(title, '') || ' ' || COALESCE(content, ''))
+      )
+    `
+
+    await sql`
       CREATE INDEX IF NOT EXISTS idx_embeddings_document_id ON embeddings(document_id)
     `
 
     await sql`
       CREATE INDEX IF NOT EXISTS idx_embeddings_user_id ON embeddings(user_id)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_document_entities_user_norm
+      ON document_entities(user_id, entity_norm)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_document_entities_document_id
+      ON document_entities(document_id)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_document_entities_user_source
+      ON document_entities(user_id, source)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_document_graph_edges_user_from
+      ON document_graph_edges(user_id, from_entity)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_document_graph_edges_user_to
+      ON document_graph_edges(user_id, to_entity)
+    `
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_document_graph_edges_document_id
+      ON document_graph_edges(document_id)
     `
 
     // ============ BOM 采购模块表 ============
