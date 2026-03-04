@@ -48,7 +48,7 @@ export default function RegisterPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
       <LiquidGlassBackground />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_14%,rgba(245,123,32,0.24),transparent_36%),radial-gradient(circle_at_16%_84%,rgba(187,35,45,0.2),transparent_30%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_90%_14%,rgba(139,92,246,0.18),transparent_36%),radial-gradient(circle_at_16%_84%,rgba(148,163,184,0.22),transparent_30%)]" />
 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -57,13 +57,13 @@ export default function RegisterPage() {
         className="naruto-glass relative z-10 w-full max-w-md rounded-[2rem] p-6 sm:p-8"
       >
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 text-white shadow-[0_12px_26px_rgba(171,64,17,0.38)]">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-[0_12px_26px_rgba(124,58,237,0.36)]">
             <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h1 className="naruto-title text-3xl font-black text-orange-950">创建账号</h1>
-          <p className="mt-2 text-sm text-orange-900/80">加入火影主题 AI 平台，开启你的效率升级。</p>
+          <h1 className="naruto-title text-3xl font-black text-slate-900">创建账号</h1>
+          <p className="mt-2 text-sm text-slate-500">加入 AI 协作平台，开启你的效率升级。</p>
         </div>
 
         {error && (
@@ -74,7 +74,7 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-semibold text-orange-900">
+            <label htmlFor="email" className="mb-2 block text-sm font-semibold text-slate-700">
               邮箱
             </label>
             <input
@@ -84,12 +84,12 @@ export default function RegisterPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="your@email.com"
-              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+              className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-300/60"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-semibold text-orange-900">
+            <label htmlFor="password" className="mb-2 block text-sm font-semibold text-slate-700">
               密码
             </label>
             <input
@@ -100,12 +100,12 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="至少 6 位"
-              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+              className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-300/60"
             />
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-semibold text-orange-900">
+            <label htmlFor="confirmPassword" className="mb-2 block text-sm font-semibold text-slate-700">
               确认密码
             </label>
             <input
@@ -115,7 +115,7 @@ export default function RegisterPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               placeholder="再次输入密码"
-              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+              className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-300/60"
             />
           </div>
 
@@ -128,9 +128,9 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-orange-900/80">
+        <p className="mt-6 text-center text-sm text-slate-500">
           已有账号？
-          <Link href="/login" className="ml-1 font-semibold text-orange-700 underline hover:text-orange-800">
+          <Link href="/login" className="ml-1 font-semibold text-violet-600 underline hover:text-violet-700">
             去登录
           </Link>
         </p>

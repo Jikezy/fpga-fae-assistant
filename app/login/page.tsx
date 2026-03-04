@@ -42,7 +42,7 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
       <LiquidGlassBackground />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_15%,rgba(245,123,32,0.24),transparent_36%),radial-gradient(circle_at_88%_12%,rgba(187,35,45,0.2),transparent_32%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_15%,rgba(148,163,184,0.2),transparent_36%),radial-gradient(circle_at_88%_12%,rgba(139,92,246,0.18),transparent_32%)]" />
 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -51,13 +51,13 @@ export default function LoginPage() {
         className="naruto-glass relative z-10 w-full max-w-md rounded-[2rem] p-6 sm:p-8"
       >
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-[0_12px_26px_rgba(171,64,17,0.38)]">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-[0_12px_26px_rgba(124,58,237,0.36)]">
             <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </div>
-          <h1 className="naruto-title text-3xl font-black text-orange-950">欢迎归队</h1>
-          <p className="mt-2 text-sm text-orange-900/80">登录后继续使用火影主题 AI 作战台。</p>
+          <h1 className="naruto-title text-3xl font-black text-slate-900">欢迎回来</h1>
+          <p className="mt-2 text-sm text-slate-500">登录后继续使用 AI 协作平台。</p>
         </div>
 
         {error && (
@@ -68,7 +68,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-semibold text-orange-900">
+            <label htmlFor="email" className="mb-2 block text-sm font-semibold text-slate-700">
               邮箱
             </label>
             <input
@@ -78,12 +78,12 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="your@email.com"
-              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+              className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-300/60"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-semibold text-orange-900">
+            <label htmlFor="password" className="mb-2 block text-sm font-semibold text-slate-700">
               密码
             </label>
             <input
@@ -93,7 +93,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="请输入密码"
-              className="w-full rounded-2xl border border-orange-200/90 bg-white/90 px-4 py-3 text-orange-950 outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/60"
+              className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-300/60"
             />
           </div>
 
@@ -106,9 +106,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-orange-900/80">
+        <p className="mt-6 text-center text-sm text-slate-500">
           还没有账号？
-          <Link href="/register" className="ml-1 font-semibold text-orange-700 underline hover:text-orange-800">
+          <Link href="/register" className="ml-1 font-semibold text-violet-600 underline hover:text-violet-700">
             立即注册
           </Link>
         </p>

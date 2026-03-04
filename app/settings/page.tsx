@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 // 预设平台配置
@@ -9,6 +9,18 @@ const PRESETS = [
   { name: 'SiliconFlow', baseUrl: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3', hint: 'siliconflow.cn 获取 Key', format: 'openai' as const },
   { name: '豆包 2.0 Pro', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-seed-2-0-pro-260215', hint: '火山方舟获取 Key', format: 'openai' as const },
 ]
+
+type ApiFormat = 'auto' | 'openai' | 'anthropic'
+
+interface SaveSettingsPayload {
+  base_url: string
+  model_name: string
+  api_format: ApiFormat
+  bom_base_url: string
+  bom_model: string
+  api_key?: string
+  bom_api_key?: string
+}
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -19,7 +31,7 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [modelName, setModelName] = useState('')
-  const [apiFormat, setApiFormat] = useState('auto')
+  const [apiFormat, setApiFormat] = useState<ApiFormat>('auto')
   const [bomApiKey, setBomApiKey] = useState('')
   const [bomBaseUrl, setBomBaseUrl] = useState('')
   const [bomModel, setBomModel] = useState('deepseek-chat')
@@ -27,12 +39,7 @@ export default function SettingsPage() {
   const [maskedBomKey, setMaskedBomKey] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  useEffect(() => {
-    checkAuth()
-    loadSettings()
-  }, [])
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
       if (!response.ok) {
@@ -42,9 +49,9 @@ export default function SettingsPage() {
       console.error('验证失败:', error)
       router.push('/login')
     }
-  }
+  }, [router])
 
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/user/settings')
@@ -65,7 +72,12 @@ export default function SettingsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    checkAuth()
+    loadSettings()
+  }, [checkAuth, loadSettings])
 
   const handlePreset = (preset: typeof PRESETS[number]) => {
     setBaseUrl(preset.baseUrl)
@@ -92,7 +104,7 @@ export default function SettingsPage() {
     setMessage(null)
 
     try {
-      const body: any = {
+      const body: SaveSettingsPayload = {
         base_url: baseUrl,
         model_name: modelName,
         api_format: apiFormat,
@@ -106,7 +118,7 @@ export default function SettingsPage() {
         // 已有 key，发送占位让后端保留
         body.api_key = '__KEEP_EXISTING__'
       }
-      // BOM Key
+      // BOM 解析 Key：仅在用户输入新值时覆盖，避免误清空历史配置
       if (bomApiKey.trim()) {
         body.bom_api_key = bomApiKey
       } else if (hasBomKey) {
@@ -127,11 +139,11 @@ export default function SettingsPage() {
         setHasApiKey(true)
         setApiKey('')
         // 重新加载以刷新脱敏 Key 显示
-        loadSettings()
+        await loadSettings()
       } else {
         setMessage({ type: 'error', text: data.error || '保存失败' })
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: '保存失败，请重试' })
     } finally {
       setSaving(false)
@@ -160,38 +172,38 @@ export default function SettingsPage() {
         setHasBomKey(false)
         setMaskedBomKey('')
       }
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: '删除失败' })
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-500 via-amber-500 to-red-500 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-white/30 border-t-white"></div>
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-violet-200 border-t-violet-600"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-100 relative overflow-hidden">
       {/* 水墨背景效果 */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(100,116,139,0.2),transparent_50%)]"></div>
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(71,85,105,0.2),transparent_50%)]"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(148,163,184,0.18),transparent_50%)]"></div>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(139,92,246,0.14),transparent_50%)]"></div>
 
       {/* 顶部导航 */}
-      <header className="bg-gray-900/30 backdrop-blur-xl shadow-lg border-b border-gray-600/30 relative z-10">
+      <header className="bg-white/80 backdrop-blur-xl shadow-sm border-b border-slate-200 relative z-10">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/chat')}
-              className="p-2 hover:bg-gray-700/30 rounded-xl transition-all backdrop-blur-sm active:scale-95"
+              className="p-2 hover:bg-violet-50 rounded-xl transition-all backdrop-blur-sm active:scale-95"
             >
-              <svg className="w-6 h-6 text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
             </button>
-            <h1 className="text-2xl font-bold text-gray-100 drop-shadow-lg">AI 设置</h1>
+            <h1 className="text-2xl font-bold text-slate-900">AI 设置</h1>
           </div>
         </div>
       </header>
@@ -203,9 +215,9 @@ export default function SettingsPage() {
           {/* 状态提示 */}
           {message && (
             <div className={`p-4 rounded-2xl backdrop-blur-sm ${
-              message.type === 'success' ? 'bg-green-900/30 border border-green-700/40' : 'bg-red-900/30 border border-red-700/40'
+              message.type === 'success' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
             }`}>
-              <p className="text-sm text-gray-100">{message.text}</p>
+              <p className="text-sm text-slate-700">{message.text}</p>
             </div>
           )}
 
@@ -309,7 +321,7 @@ export default function SettingsPage() {
               </label>
               <select
                 value={apiFormat}
-                onChange={(e) => setApiFormat(e.target.value)}
+                onChange={(e) => setApiFormat(e.target.value as ApiFormat)}
                 className="w-full px-4 py-3 bg-gray-800/40 backdrop-blur-sm border border-gray-600/40 rounded-2xl focus:ring-2 focus:ring-gray-500 focus:border-transparent outline-none text-gray-100"
               >
                 <option value="auto">自动检测（先试 OpenAI，失败回退 Anthropic）</option>
@@ -393,14 +405,14 @@ export default function SettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 bg-gradient-to-r from-gray-700 to-gray-900 text-gray-100 py-3 px-4 rounded-2xl hover:shadow-2xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-xl ring-1 ring-gray-500/50"
+               className="flex-1 bg-gradient-to-r from-violet-500 to-indigo-600 text-white py-3 px-4 rounded-2xl hover:shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-[0_10px_30px_rgba(124,58,237,0.32)]"
             >
               {saving ? '保存中...' : '保存配置'}
             </button>
             {hasApiKey && (
               <button
                 onClick={handleDelete}
-                className="px-6 py-3 bg-red-900/40 backdrop-blur-sm border border-red-700/40 text-red-300 rounded-2xl hover:bg-red-900/60 active:scale-95 transition-all"
+                className="px-6 py-3 bg-white border border-red-200 text-red-600 rounded-2xl hover:bg-red-50 active:scale-95 transition-all"
               >
                 删除配置
               </button>

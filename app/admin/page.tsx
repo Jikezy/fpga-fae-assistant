@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface User {
@@ -8,6 +8,12 @@ interface User {
   email: string
   role: string
   createdAt: string
+}
+
+interface CurrentUser {
+  id: string
+  email: string
+  role: 'admin' | 'user'
 }
 
 interface OpsTableStat {
@@ -59,7 +65,7 @@ export default function AdminPage() {
   const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [migrating, setMigrating] = useState(false)
   const [migrateMessage, setMigrateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [opsMetrics, setOpsMetrics] = useState<OpsMetrics | null>(null)
@@ -67,17 +73,15 @@ export default function AdminPage() {
   const [opsError, setOpsError] = useState<string | null>(null)
   const [clearingUserId, setClearingUserId] = useState<string | null>(null)
 
-  useEffect(() => {
-    checkAuth()
-    loadUsers()
-    loadOps()
-  }, [])
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me')
       if (response.ok) {
-        const data = await response.json()
+        const data = await response.json() as { user?: CurrentUser }
+        if (!data.user) {
+          router.push('/login')
+          return
+        }
         setCurrentUser(data.user)
         if (data.user.role !== 'admin') {
           router.push('/chat')
@@ -89,24 +93,24 @@ export default function AdminPage() {
       console.error('验证失败:', error)
       router.push('/login')
     }
-  }
+  }, [router])
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch('/api/admin/users')
       if (response.ok) {
-        const data = await response.json()
-        setUsers(data.users)
+        const data = await response.json() as { users?: User[] }
+        setUsers(data.users || [])
       }
     } catch (error) {
       console.error('加载用户失败:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const loadOps = async () => {
+  const loadOps = useCallback(async () => {
     try {
       setOpsLoading(true)
       setOpsError(null)
@@ -122,7 +126,13 @@ export default function AdminPage() {
     } finally {
       setOpsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    checkAuth()
+    loadUsers()
+    loadOps()
+  }, [checkAuth, loadUsers, loadOps])
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!confirm(`确定要将此用户设置为${newRole === 'admin' ? '管理员' : '普通用户'}吗？`)) {
@@ -268,9 +278,9 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-100">
       {/* 顶部导航 */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-white/90 border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center gap-4">
@@ -319,8 +329,8 @@ export default function AdminPage() {
                   {users.filter(u => u.role === 'admin').length}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-violet-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
@@ -486,7 +496,7 @@ export default function AdminPage() {
                       <span
                         className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           user.role === 'admin'
-                            ? 'bg-orange-100 text-orange-800'
+                            ? 'bg-violet-100 text-violet-700'
                             : 'bg-green-100 text-green-800'
                         }`}
                       >

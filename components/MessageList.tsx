@@ -35,7 +35,7 @@ const markdownComponents: Components = {
         {String(children).replace(/\n$/, '')}
       </SyntaxHighlighter>
     ) : (
-      <code className="rounded-lg border border-orange-300 bg-orange-100 px-2 py-0.5 text-sm text-orange-900">
+      <code className="rounded-lg border border-violet-200 bg-violet-100/80 px-2 py-0.5 text-sm text-violet-800">
         {children}
       </code>
     )
@@ -43,25 +43,25 @@ const markdownComponents: Components = {
   table({ children }) {
     return (
       <div className="my-4 overflow-x-auto">
-        <table className="min-w-full overflow-hidden rounded-2xl border border-orange-200 bg-white/90">
+        <table className="min-w-full overflow-hidden rounded-2xl border border-slate-200 bg-white/95">
           {children}
         </table>
       </div>
     )
   },
   thead({ children }) {
-    return <thead className="bg-orange-100">{children}</thead>
+    return <thead className="bg-violet-100/70">{children}</thead>
   },
   th({ children }) {
     return (
-      <th className="border-b-2 border-orange-300 px-4 py-2 text-left text-sm font-semibold text-orange-900">
+      <th className="border-b-2 border-violet-200 px-4 py-2 text-left text-sm font-semibold text-slate-800">
         {children}
       </th>
     )
   },
   td({ children }) {
     return (
-      <td className="border-b border-orange-200 px-4 py-2 text-sm text-orange-900/85">
+      <td className="border-b border-slate-200 px-4 py-2 text-sm text-slate-700">
         {children}
       </td>
     )
@@ -102,7 +102,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           className={`flex gap-2 sm:gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
         >
           {message.role === 'assistant' && (
-            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-lg ring-2 ring-orange-200 sm:h-8 sm:w-8">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg ring-2 ring-violet-200 sm:h-8 sm:w-8">
               <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
@@ -110,16 +110,16 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           )}
 
           <div
-            className={`flex-1 max-w-3xl rounded-3xl px-3 py-3 shadow-[0_10px_24px_rgba(171,64,17,0.12)] sm:px-5 sm:py-4 ${
-              message.role === 'user'
-                ? 'rounded-tr-md border border-orange-200/70 bg-gradient-to-br from-orange-50/95 to-amber-100/85 text-orange-950'
-                : 'naruto-glass rounded-tl-md'
-            }`}
-          >
+              className={`flex-1 max-w-3xl rounded-3xl px-3 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.1)] sm:px-5 sm:py-4 ${
+                message.role === 'user'
+                  ? 'rounded-tr-md border border-slate-200 bg-gradient-to-br from-slate-100 to-slate-200 text-slate-900'
+                  : 'naruto-glass rounded-tl-md'
+              }`}
+            >
             {message.role === 'user' ? (
-              <p className="whitespace-pre-wrap font-medium text-orange-950">{message.content}</p>
+              <p className="whitespace-pre-wrap font-medium text-slate-900">{message.content}</p>
             ) : (
-              <div className="markdown-body prose prose-sm max-w-none text-orange-950">
+              <div className="markdown-body prose prose-sm max-w-none text-slate-800">
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={markdownComponents}
@@ -129,7 +129,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
               </div>
             )}
 
-            <p className="mt-2 text-xs font-medium text-orange-800/70">
+            <p className="mt-2 text-xs font-medium text-slate-500">
               {message.timestamp.toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
                 minute: '2-digit',
@@ -149,7 +149,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
 
       {isLoading && (
         <div className="flex justify-start gap-2 sm:gap-4">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-lg ring-2 ring-orange-200 sm:h-8 sm:w-8">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg ring-2 ring-violet-200 sm:h-8 sm:w-8">
             <svg className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
@@ -157,14 +157,14 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           <div className="naruto-glass rounded-3xl rounded-tl-md px-4 py-3 sm:px-5 sm:py-4">
             <div className="flex items-center gap-3">
               <div className="flex gap-1">
-                <span className="h-2 w-2 animate-bounce rounded-full bg-orange-500" style={{ animationDelay: '0ms' }} />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-orange-500" style={{ animationDelay: '150ms' }} />
-                <span className="h-2 w-2 animate-bounce rounded-full bg-red-500" style={{ animationDelay: '300ms' }} />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-violet-500" style={{ animationDelay: '0ms' }} />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-violet-500" style={{ animationDelay: '150ms' }} />
+                <span className="h-2 w-2 animate-bounce rounded-full bg-indigo-500" style={{ animationDelay: '300ms' }} />
               </div>
-              <span className="text-xs text-orange-800/70">
+              <span className="text-xs text-slate-500">
                 {thinkingLabel}
                 {elapsed > 0 && (
-                  <span className="ml-1 tabular-nums text-orange-500/80">{elapsed}s</span>
+                  <span className="ml-1 tabular-nums text-violet-500/80">{elapsed}s</span>
                 )}
               </span>
             </div>
